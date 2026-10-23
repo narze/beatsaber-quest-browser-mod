@@ -9,9 +9,9 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 1. Install `QuestBrowser.qmod` with [ModsBeforeFriday](https://mbf.bsquest.xyz/) or QuestPatcher. It installs BSML, custom-types, and beatsaber-hook too if they are missing.
 2. The browser is one floating window. It stays open in the menu and in songs, and the page does not reload between them.
    - **Browser** in the mods list on the left of the main menu shows or hides it.
-   - Menu: click the page, and drag the handle below the window to move it.
-   - Song: the page shows, but you can not click it. Pause to click it or to move it.
-   - The menu and songs each keep their own window position.
+   - Menu: click the page, drag the handle below the window to move it, and drag the grip in its bottom-right corner to resize it.
+   - Song: the page shows, but you can not click it. Pause to click, move, or resize it.
+   - The menu and songs each keep their own window position and size.
 3. Controls:
    - Point at the page and pull the trigger to click. Hold the trigger and move to drag.
    - Move the thumbstick up or down to scroll the page under the pointer.
@@ -20,7 +20,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
    - **<**, **>**, **Reload**, **Home** work like in a desktop browser.
    - Fullscreen video fills the browser window. **<** or **Esc** leaves fullscreen.
-4. Mod settings > **Browser**: show the window during songs or not, and reset the positions.
+4. Mod settings > **Browser**: show the window during songs or not, and reset the positions and sizes.
 
 The page stops (timers, video, audio) while the window is hidden. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
 

@@ -2,6 +2,7 @@
 
 #include "BrowserScreen.hpp"
 #include "Config.hpp"
+#include "ResizeGrip.hpp"
 #include "GlobalNamespace/MainMenuViewController.hpp"
 #include "GlobalNamespace/PauseController.hpp"
 #include "UnityEngine/Camera.hpp"
@@ -21,18 +22,19 @@ namespace QuestBrowser::Window {
 namespace {
 
 // Fits the layout in BrowserScreen.cpp: 144 x 81 page, toolbar, title, padding.
-// Scaled to about 1.8 m x 1.3 m.
+// At the default scale, about 1.8 m x 1.3 m; the corner grip changes the scale.
 constexpr Vector2 kScreenSize{150.0f, 106.0f};
-constexpr float kScale = 0.012f;
 
 Logic::Context context = Logic::Context::Menu;
 std::optional<Logic::PoseSlot> placedFor;
 SafePtrUnity<BSML::FloatingScreen> floatingScreen;
 SafePtrUnity<BrowserScreen> browserScreen;
+SafePtrUnity<ResizeGrip> resizeGrip;
 
 void OnHandleReleased(BSML::FloatingScreen*, BSML::FloatingScreenHandleEventArgs const& args) {
     if (!placedFor) return;
-    Config::SetPose(*placedFor, {args.position, args.rotation});
+    float scale = floatingScreen ? floatingScreen->transform->localScale.x : Config::kDefaultScale;
+    Config::SetPose(*placedFor, {args.position, args.rotation, scale});
     logger.info("Saved browser position for {}", *placedFor == Logic::PoseSlot::Menu ? "menu" : "songs");
 }
 
@@ -40,7 +42,7 @@ void EnsureCreated() {
     if (floatingScreen) return;
     auto screen = BSML::FloatingScreen::CreateFloatingScreen(kScreenSize, true, {}, Quaternion::get_identity(), 0.0f, true);
     screen->name = "QuestBrowserWindow";
-    screen->transform->localScale = Vector3(kScale, kScale, kScale);
+    screen->transform->localScale = Vector3(Config::kDefaultScale, Config::kDefaultScale, Config::kDefaultScale);
     // Keep the window, and so the page, when the game changes scenes.
     Object::DontDestroyOnLoad(screen->gameObject);
     screen->HandleReleased.addCallback(&OnHandleReleased);
@@ -49,6 +51,12 @@ void EnsureCreated() {
     floatingScreen = screen;
     placedFor.reset();
     browserScreen = BrowserScreen::CreateIn(screen->transform);
+    resizeGrip = ResizeGrip::Create(screen->transform, [](float scale) {
+        if (!placedFor) return;
+        auto pose = Config::GetPose(*placedFor);
+        pose.scale = scale;
+        Config::SetPose(*placedFor, pose);
+    });
     logger.info("Created browser window");
 }
 
@@ -74,10 +82,12 @@ void Apply() {
         }
 #endif
         floatingScreen->transform->SetPositionAndRotation(pose.position, pose.rotation);
+        floatingScreen->transform->localScale = Vector3(pose.scale, pose.scale, pose.scale);
         placedFor = state.pose;
     }
     floatingScreen->gameObject->SetActive(true);
     floatingScreen->set_ShowHandle(state.showHandle);
+    if (resizeGrip) resizeGrip->gameObject->SetActive(state.showHandle);
     if (browserScreen) browserScreen->SetInteractive(state.interactive);
 }
 

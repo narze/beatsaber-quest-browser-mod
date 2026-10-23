@@ -8,9 +8,9 @@ namespace QuestBrowser::Config {
 namespace {
 
 // Songs: to the left of the track, turned to face the player (yaw -50 degrees).
-constexpr Pose kDefaultSongPose{{-2.6f, 1.6f, 2.4f}, {0.0f, -0.4226f, 0.0f, 0.9063f}};
+constexpr Pose kDefaultSongPose{{-2.6f, 1.6f, 2.4f}, {0.0f, -0.4226f, 0.0f, 0.9063f}, kDefaultScale};
 // Menu: above the main menu screens, tilted down to the player (pitch -25 degrees).
-constexpr Pose kDefaultMenuPose{{0.0f, 3.4f, 3.6f}, {-0.2164f, 0.0f, 0.0f, 0.9763f}};
+constexpr Pose kDefaultMenuPose{{0.0f, 3.4f, 3.6f}, {-0.2164f, 0.0f, 0.0f, 0.9763f}, kDefaultScale};
 
 // Song keys have no prefix, for compatibility with configs from 0.1.0.
 char const* Prefix(Logic::PoseSlot slot) { return slot == Logic::PoseSlot::Menu ? "menu" : ""; }
@@ -78,6 +78,7 @@ Pose GetPose(Logic::PoseSlot slot) {
     return {
         {f("posX", d.position.x), f("posY", d.position.y), f("posZ", d.position.z)},
         {f("rotX", d.rotation.x), f("rotY", d.rotation.y), f("rotZ", d.rotation.z), f("rotW", d.rotation.w)},
+        f("scale", d.scale),
     };
 }
 
@@ -90,6 +91,7 @@ void SetPose(Logic::PoseSlot slot, Pose const& pose) {
     f("rotY", pose.rotation.y);
     f("rotZ", pose.rotation.z);
     f("rotW", pose.rotation.w);
+    f("scale", pose.scale);
     Get().Write();
 }
 

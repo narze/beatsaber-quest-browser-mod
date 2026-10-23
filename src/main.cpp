@@ -46,10 +46,11 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
                                          QuestBrowser::Window::Refresh();
                                      });
             BSML::Lite::CreateText(container->transform,
-                                   "Move the window with the handle below it. The menu and songs each keep their own position. "
+                                   "Move the window with the handle below it, and resize it with the grip in its bottom-right corner. "
+                                   "The menu and songs each keep their own position and size. "
                                    "In a song, pause to click or move it.",
                                    3.5f);
-            BSML::Lite::CreateUIButton(container->transform, "Reset positions", QuestBrowser::Window::ResetPositions);
+            BSML::Lite::CreateUIButton(container->transform, "Reset positions and sizes", QuestBrowser::Window::ResetPositions);
         },
         false);
 
