@@ -1,0 +1,117 @@
+package com.narze.questbrowser.harness;
+
+import android.app.Activity;
+import android.graphics.Bitmap;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+
+import dalvik.system.InMemoryDexClassLoader;
+
+/**
+ * Loads questbrowser.dex the same way the native mod does and drives the
+ * BrowserBridge API: tap an input, type text, tap a button, scroll, and save
+ * frames. run.sh checks the page title and the PNG files.
+ */
+public class HarnessActivity extends Activity {
+    private static final String TAG = "QBHarness";
+    private static final int W = 1280;
+    private static final int H = 720;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Class<?> bridge;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        try {
+            byte[] dex = readAsset("questbrowser.dex");
+            ClassLoader loader = new InMemoryDexClassLoader(ByteBuffer.wrap(dex), getClassLoader());
+            bridge = loader.loadClass("com.narze.questbrowser.BrowserBridge");
+            call("init", new Class<?>[] {Object.class, int.class, int.class, String.class},
+                    this, W, H, "file:///android_asset/test.html");
+            call("setActive", new Class<?>[] {boolean.class}, true);
+        } catch (Throwable t) {
+            Log.e(TAG, "FAIL setup", t);
+            return;
+        }
+
+        // Centers of the elements in test.html, in page pixels.
+        final float inputX = W / 2f, inputY = H * 0.10f;
+        final float buttonX = W / 2f, buttonY = H * 0.40f;
+
+        at(3000, () -> {
+            saveFrame("frame1.png");
+            tap(inputX, inputY);
+        });
+        at(4000, () -> call("typeText", new Class<?>[] {String.class}, "hello quest"));
+        at(5000, () -> tap(buttonX, buttonY));
+        at(6000, () -> call("scroll", new Class<?>[] {float.class, float.class, float.class}, W / 2f, H * 0.8f, -5f));
+        at(8000, () -> {
+            saveFrame("frame2.png");
+            Log.i(TAG, "TITLE " + call("getTitle", new Class<?>[0]));
+            Log.i(TAG, "URL " + call("getUrl", new Class<?>[0]));
+            Log.i(TAG, "DONE");
+        });
+    }
+
+    private void tap(float x, float y) {
+        Class<?>[] sig = {int.class, float.class, float.class};
+        call("touch", sig, 0, x, y);
+        call("touch", sig, 1, x, y);
+    }
+
+    private void saveFrame(String name) {
+        ByteBuffer buf = (ByteBuffer) call("acquireFrame", new Class<?>[0]);
+        if (buf == null) {
+            Log.e(TAG, "FAIL no frame for " + name);
+            return;
+        }
+        try {
+            Bitmap bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+            buf.rewind();
+            bmp.copyPixelsFromBuffer(buf);
+            File out = new File(getExternalFilesDir(null), name);
+            try (FileOutputStream fos = new FileOutputStream(out)) {
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            }
+            Log.i(TAG, "SAVED " + out);
+        } catch (Exception e) {
+            Log.e(TAG, "FAIL save " + name, e);
+        } finally {
+            call("releaseFrame", new Class<?>[0]);
+        }
+    }
+
+    private Object call(String name, Class<?>[] sig, Object... args) {
+        try {
+            Method m = bridge.getMethod(name, sig);
+            return m.invoke(null, args);
+        } catch (Exception e) {
+            Log.e(TAG, "FAIL call " + name, e);
+            return null;
+        }
+    }
+
+    private void at(long delayMs, Runnable r) {
+        handler.postDelayed(r, delayMs);
+    }
+
+    private byte[] readAsset(String name) throws Exception {
+        try (InputStream in = getAssets().open(name)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] b = new byte[8192];
+            int n;
+            while ((n = in.read(b)) > 0) out.write(b, 0, n);
+            return out.toByteArray();
+        }
+    }
+}

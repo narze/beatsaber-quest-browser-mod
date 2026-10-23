@@ -27,3 +27,5 @@ build/
 
 # Host test build
 build-tests/
+!tests/android-harness/assets/*.html
+build-harness/

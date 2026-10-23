@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ready</title>
+<style>
+  body { margin: 0; font: 16px sans-serif; }
+  #i { position: fixed; left: 2vw; top: 2vh; width: 96vw; height: 16vh; font-size: 8vh; box-sizing: border-box; }
+  #b { position: fixed; left: 2vw; top: 30vh; width: 96vw; height: 20vh; font-size: 8vh; }
+  #marker { margin: 0; padding-top: 400px; font-size: 40px; font-weight: bold; }
+  #tall { height: 5000px; background: linear-gradient(#ffd54f, #1e88e5); }
+</style>
+</head>
+<body>
+<input id="i" placeholder="type here">
+<button id="b">Click me</button>
+<div id="tall"><p id="marker">SCROLL MARKER</p></div>
+<script>
+  var clicks = 0;
+  function upd() {
+    document.title = 'clicks=' + clicks + ' text=' + document.getElementById('i').value + ' y=' + Math.round(window.scrollY);
+  }
+  document.getElementById('b').addEventListener('click', function () { clicks++; upd(); });
+  document.getElementById('i').addEventListener('input', upd);
+  window.addEventListener('scroll', upd);
+</script>
+</body>
+</html>
