@@ -8,6 +8,7 @@
 #include "UnityEngine/Texture2D.hpp"
 #include "UnityEngine/UI/RawImage.hpp"
 #include "VRUIControls/VRPointer.hpp"
+#include "KeyboardPanel.hpp"
 #include "browser_logic.hpp"
 #include "custom-types/shared/macros.hpp"
 
@@ -19,6 +20,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::Texture2D>, texture);
     DECLARE_INSTANCE_FIELD(UnityW<VRUIControls::VRPointer>, pointer);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::CanvasGroup>, canvasGroup);
+    DECLARE_INSTANCE_FIELD(UnityW<KeyboardPanel>, keyboard);
 
     DECLARE_INSTANCE_METHOD(void, OnEnable);
     DECLARE_INSTANCE_METHOD(void, OnDisable);
@@ -28,8 +30,6 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_METHOD(void, OnForward);
     DECLARE_INSTANCE_METHOD(void, OnReload);
     DECLARE_INSTANCE_METHOD(void, OnHome);
-    DECLARE_INSTANCE_METHOD(void, OnEnterKey);
-    DECLARE_INSTANCE_METHOD(void, OnBackspace);
     DECLARE_INSTANCE_METHOD(void, OnUrl);
     DECLARE_INSTANCE_METHOD(void, OnKeyboard);
 
@@ -48,6 +48,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     void UpdateTexture();
     void UpdateInput();
     void UpdateLabels();
+    void HideKeyboard();
 
     bool ready = false;
     bool interactive = true;

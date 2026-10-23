@@ -24,12 +24,13 @@ void Reload();
 // action: 0 down, 1 up, 2 move, 3 cancel (Android MotionEvent values).
 void Touch(int action, float x, float y);
 void Scroll(float x, float y, float amount);
-void PressKey(int androidKeyCode);
-
-// System keyboard (Android IME).
-void ShowUrlKeyboard(std::string_view currentUrl);
-void ShowPageKeyboard();
-void HideKeyboard();
+// In-game keyboard. Text and keys go to the address field while it is in use, else to the page.
+void SendText(std::string_view text);
+void SendKey(int androidKeyCode, int metaState);
+void BeginUrlEditing(std::string_view currentUrl);
+void CancelUrlEditing();
+// True once after the user tapped a text field in the page.
+bool TakeKeyboardRequest();
 // The address being typed, or nullopt when the address field is not in use.
 std::optional<std::string> GetUrlDraft();
 // The address submitted with Enter, once.

@@ -25,10 +25,6 @@ namespace {
 constexpr int kPageWidth = 1280;
 constexpr int kPageHeight = 720;
 
-// Android key codes.
-constexpr int kKeyEnter = 66;
-constexpr int kKeyDelete = 67;
-
 // Trigger hysteresis, so a half-pulled trigger does not flicker.
 constexpr float kTriggerPress = 0.75f;
 constexpr float kTriggerRelease = 0.35f;
@@ -41,14 +37,12 @@ constexpr std::string_view kLayout = R"xml(
 <bg>
   <vertical spacing="1" pad="3" child-align="UpperCenter" child-expand-height="false" child-control-height="true">
     <horizontal spacing="1" pref-height="8" child-expand-width="false">
-      <button text="&lt;" on-click="OnBack" pref-width="10" hover-hint="Back"/>
-      <button text="&gt;" on-click="OnForward" pref-width="10" hover-hint="Forward"/>
-      <button text="Reload" on-click="OnReload" pref-width="17"/>
-      <button text="Home" on-click="OnHome" pref-width="15"/>
-      <button text="URL" on-click="OnUrl" pref-width="13" hover-hint="Type an address or a search"/>
-      <button text="Keys" on-click="OnKeyboard" pref-width="15" hover-hint="Open the keyboard for the selected field"/>
-      <button text="Enter" on-click="OnEnterKey" pref-width="16"/>
-      <button text="Del" on-click="OnBackspace" pref-width="13" hover-hint="Backspace"/>
+      <button text="&lt;" on-click="OnBack" pref-width="14" hover-hint="Back"/>
+      <button text="&gt;" on-click="OnForward" pref-width="14" hover-hint="Forward"/>
+      <button text="Reload" on-click="OnReload" pref-width="22"/>
+      <button text="Home" on-click="OnHome" pref-width="20"/>
+      <button text="URL" on-click="OnUrl" pref-width="20" hover-hint="Type an address or a search"/>
+      <button text="Keyboard" on-click="OnKeyboard" pref-width="28" hover-hint="Show or hide the keyboard"/>
     </horizontal>
     <text id="titleText" text="Loading..." font-size="3.5" pref-height="5" align="Left"/>
     <raw-image id="pageImage" pref-width="144" pref-height="81"/>
@@ -64,6 +58,8 @@ BrowserScreen* BrowserScreen::CreateIn(Transform* parent) {
     screen->canvasGroup = go->GetComponent<CanvasGroup*>();
     if (!screen->canvasGroup) screen->canvasGroup = go->AddComponent<CanvasGroup*>();
     BSML::parse_and_construct(kLayout, parent, screen);
+    auto parentRect = parent->GetComponent<RectTransform*>();
+    screen->keyboard = KeyboardPanel::Create(parent, parentRect ? parentRect->rect.height : 100.0f);
     screen->Setup();
     return screen;
 }
@@ -76,7 +72,7 @@ void BrowserScreen::SetInteractive(bool value) {
         Jni::Touch(3, p.x, p.y);
     }
     if (!value) {
-        if (ready) Jni::HideKeyboard();
+        HideKeyboard();
         tracker = {};
         triggerHeld = false;
     }
@@ -101,6 +97,10 @@ void BrowserScreen::Setup() {
         if (titleText) titleText->text = "Browser failed to start. See the log for details.";
         return;
     }
+#ifdef QB_DEBUG_SHOW_KEYBOARD
+    // Debug builds (qpm s build -D QB_DEBUG_SHOW_KEYBOARD=1): open the keyboard at start, for screenshots.
+    if (keyboard) keyboard->SetVisible(true);
+#endif
     OnEnable();
 }
 
@@ -201,10 +201,13 @@ void BrowserScreen::UpdateLabels() {
         auto url = Logic::NormalizeUrl(*submitted);
         logger.info("Loading {}", url);
         Jni::LoadUrl(url);
+        if (keyboard) keyboard->SetVisible(false);
     }
+    // The user tapped a text field in the page.
+    if (Jni::TakeKeyboardRequest() && interactive && keyboard) keyboard->SetVisible(true);
     if (!titleText) return;
 
-    // While the address is typed, show it here: the system keyboard does not.
+    // While the address is typed, show it here: the address field is not drawn.
     if (auto draft = Jni::GetUrlDraft()) {
         titleText->text = fmt::format("URL: {}_", *draft);
         return;
@@ -224,10 +227,20 @@ void BrowserScreen::OnBack() { Jni::GoBack(); }
 void BrowserScreen::OnForward() { Jni::GoForward(); }
 void BrowserScreen::OnReload() { Jni::Reload(); }
 void BrowserScreen::OnHome() { Jni::LoadUrl(Logic::kHomeUrl); }
-void BrowserScreen::OnEnterKey() { Jni::PressKey(kKeyEnter); }
-void BrowserScreen::OnBackspace() { Jni::PressKey(kKeyDelete); }
 
-void BrowserScreen::OnUrl() { Jni::ShowUrlKeyboard(Jni::GetUrl()); }
-void BrowserScreen::OnKeyboard() { Jni::ShowPageKeyboard(); }
+void BrowserScreen::OnUrl() {
+    Jni::BeginUrlEditing(Jni::GetUrl());
+    if (keyboard) keyboard->SetVisible(true);
+}
+
+void BrowserScreen::OnKeyboard() {
+    if (keyboard && keyboard->IsVisible()) HideKeyboard();
+    else if (keyboard) keyboard->SetVisible(true);
+}
+
+void BrowserScreen::HideKeyboard() {
+    if (ready) Jni::CancelUrlEditing();
+    if (keyboard) keyboard->SetVisible(false);
+}
 
 }  // namespace QuestBrowser

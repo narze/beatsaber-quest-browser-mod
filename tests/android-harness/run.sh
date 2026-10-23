@@ -63,16 +63,12 @@ adb logcat -c
 adb shell am force-stop "$PKG"
 adb shell am start -n "$PKG/.HarnessActivity" --es mode keyboard >/dev/null
 kb=0
-waitlog "READY_URL" || { echo "FAIL: URL keyboard not ready"; kb=1; }
-adb shell input text "example.org/page"
-waitlog "DRAFT example.org/page" || { echo "FAIL: URL draft not seen"; kb=1; }
-adb shell input keyevent 66
-waitlog "SUBMITTED example.org/page" || { echo "FAIL: URL not submitted"; kb=1; }
-waitlog "DRAFT_AFTER null" || { echo "FAIL: URL editing did not end"; kb=1; }
-waitlog "READY_PAGE" || { echo "FAIL: page field not ready"; kb=1; }
-adb shell input text "typed"
-waitlog "TITLE clicks=0 text=typed" || { echo "FAIL: text did not reach the page field"; kb=1; }
-adb logcat -d -s QBHarness:* QuestBrowser:* | grep -v "TITLE" | tee "$OUT/logcat-keyboard.txt"
+waitlog "KEYBOARD_DONE" || { echo "FAIL: keyboard test did not finish"; kb=1; }
+for want in "DRAFT example.org/page" "SUBMITTED example.org/page" "DRAFT_AFTER null" \
+            "KEYBOARD_REQUESTED true" "TITLE1 clicks=0 text=Typed " "TITLE2 clicks=0 text=x "; do
+    adb logcat -d -s QBHarness:* | grep -q "$want" || { echo "FAIL: expected '$want'"; kb=1; }
+done
+adb logcat -d -s QBHarness:* QuestBrowser:* | tee "$OUT/logcat-keyboard.txt"
 
 echo "== Check"
 fail=0

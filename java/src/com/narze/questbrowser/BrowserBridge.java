@@ -13,12 +13,12 @@ import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.InputDevice;
+import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
-import android.view.inputmethod.InputMethodManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -63,12 +63,14 @@ public final class BrowserBridge {
     private static Canvas canvas;
     private static long downTime;
 
-    // Hidden address field. The system keyboard types into it; the native side
+    // Hidden address field. The in-game keyboard types into it; the native side
     // shows the draft and loads the URL that is submitted with Enter.
     private static EditText urlField;
     private static volatile boolean editingUrl;
     private static volatile String urlDraft = "";
     private static volatile String submittedUrl;
+    // Set when the user taps a text field in the page, so the native side opens its keyboard.
+    private static volatile boolean keyboardRequested;
 
     private BrowserBridge() {}
 
@@ -201,21 +203,7 @@ public final class BrowserBridge {
 
     private static void endUrlEditing() {
         editingUrl = false;
-        hideImeNow();
         webView.requestFocus();
-    }
-
-    private static InputMethodManager imm() {
-        return (InputMethodManager) webView.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-    }
-
-    private static void showImeFor(View view) {
-        boolean shown = imm().showSoftInput(view, 0);
-        Log.i(TAG, "showSoftInput(" + view.getClass().getSimpleName() + ") = " + shown);
-    }
-
-    private static void hideImeNow() {
-        imm().hideSoftInputFromWindow(container.getWindowToken(), 0);
     }
 
     private static Context resolveContext(Object host) {
@@ -250,7 +238,6 @@ public final class BrowserBridge {
                     startRenderLoop();
                 } else {
                     editingUrl = false;
-                    hideImeNow();
                     webView.onPause();
                     webView.pauseTimers();
                 }
@@ -416,17 +403,16 @@ public final class BrowserBridge {
     private static void showImeIfEditableFocused() {
         if (webView == null) return;
         webView.evaluateJavascript(IS_EDITABLE_JS, result -> {
-            if ("true".equals(result)) {
-                if (!webView.hasFocus()) webView.requestFocus();
-                showImeFor(webView);
-            }
+            if ("true".equals(result)) keyboardRequested = true;
         });
     }
 
     // ---- Keyboard --------------------------------------------------------
+    // The keyboard is drawn in the game. These calls send its keys to the
+    // focused field: the hidden address field while it is in use, else the page.
 
-    /** Opens the system keyboard on the hidden address field, filled with url. */
-    public static void showUrlKeyboard(final String url) {
+    /** Starts typing an address in the hidden address field, filled with url and selected. */
+    public static void beginUrlEditing(final String url) {
         post(new Runnable() {
             @Override
             public void run() {
@@ -434,7 +420,6 @@ public final class BrowserBridge {
                 urlField.selectAll();
                 urlField.requestFocus();
                 editingUrl = true;
-                showImeFor(urlField);
             }
         });
     }
@@ -451,24 +436,61 @@ public final class BrowserBridge {
         return url;
     }
 
-    /** Opens the system keyboard for the focused element of the page. */
-    public static void showPageKeyboard() {
+    /** True once after the user tapped a text field in the page. */
+    public static boolean takeKeyboardRequest() {
+        boolean requested = keyboardRequested;
+        keyboardRequested = false;
+        return requested;
+    }
+
+    /** Types text into the focused field. */
+    public static void sendText(final String text) {
         post(new Runnable() {
             @Override
             public void run() {
-                editingUrl = false;
-                webView.requestFocus();
-                showImeFor(webView);
+                if (editingUrl) {
+                    Editable e = urlField.getText();
+                    int a = Math.max(0, Math.min(urlField.getSelectionStart(), urlField.getSelectionEnd()));
+                    int b = Math.max(0, Math.max(urlField.getSelectionStart(), urlField.getSelectionEnd()));
+                    e.replace(a, b, text);
+                    return;
+                }
+                if (!webView.hasFocus()) webView.requestFocus();
+                // Key events work in every page; text that has no keys (for example Thai) is inserted with JS.
+                KeyEvent[] events = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(text.toCharArray());
+                if (events != null) {
+                    for (KeyEvent e : events) webView.dispatchKeyEvent(e);
+                } else {
+                    typeText(text);
+                }
             }
         });
     }
 
-    public static void hideKeyboard() {
+    /** Sends a key press with a meta state, for example KEYCODE_DEL (67) or Ctrl+A (29, META_CTRL_ON). */
+    public static void sendKey(final int keyCode, final int metaState) {
         post(new Runnable() {
             @Override
             public void run() {
-                editingUrl = false;
-                hideImeNow();
+                if (editingUrl && keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                    endUrlEditing();
+                    return;
+                }
+                View target = editingUrl ? urlField : webView;
+                if (target == webView && !webView.hasFocus()) webView.requestFocus();
+                long now = SystemClock.uptimeMillis();
+                target.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, metaState));
+                target.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, metaState));
+            }
+        });
+    }
+
+    /** Stops typing an address, if that is in progress. */
+    public static void cancelUrlEditing() {
+        post(new Runnable() {
+            @Override
+            public void run() {
+                if (editingUrl) endUrlEditing();
             }
         });
     }
@@ -509,16 +531,6 @@ public final class BrowserBridge {
         });
     }
 
-    /** Sends a key press, for example KeyEvent.KEYCODE_ENTER (66) or KEYCODE_DEL (67). */
-    public static void pressKey(final int keyCode) {
-        post(new Runnable() {
-            @Override
-            public void run() {
-                webView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyCode));
-                webView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyCode));
-            }
-        });
-    }
 
     private static void post(final Runnable r) {
         ui.post(new Runnable() {

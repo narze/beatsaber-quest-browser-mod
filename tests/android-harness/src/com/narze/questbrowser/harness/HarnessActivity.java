@@ -69,44 +69,39 @@ public class HarnessActivity extends Activity {
     }
 
     /**
-     * Keyboard test. run.sh types with "adb shell input", which goes through the
-     * same Android input path as the Quest system keyboard.
-     * 1. URL bar: showUrlKeyboard, the script types a URL and presses Enter.
-     * 2. Page field: tap the input in test.html, the script types into it.
+     * Keyboard test. Drives the same bridge calls as the in-game keyboard:
+     * 1. Address: beginUrlEditing, sendText, Enter.
+     * 2. Page field: tap it (the bridge asks for the keyboard), sendText, Del, Ctrl+A.
      */
     private void runKeyboardTest() {
+        final Class<?>[] text = {String.class};
+        final Class<?>[] key = {int.class, int.class};
         at(3000, () -> {
-            call("showUrlKeyboard", new Class<?>[] {String.class}, "https://old.example/");
-            Log.i(TAG, "READY_URL");
-            pollUrl();
+            call("beginUrlEditing", text, "https://old.example/");
+            call("sendText", text, "example.org/page");
         });
-    }
-
-    private String lastDraft;
-
-    private void pollUrl() {
-        String draft = (String) call("getUrlDraft", new Class<?>[0]);
-        if (draft != null && !draft.equals(lastDraft)) {
-            lastDraft = draft;
-            Log.i(TAG, "DRAFT " + draft);
-        }
-        String submitted = (String) call("takeSubmittedUrl", new Class<?>[0]);
-        if (submitted == null) {
-            at(200, this::pollUrl);
-            return;
-        }
-        Log.i(TAG, "SUBMITTED " + submitted);
-        Log.i(TAG, "DRAFT_AFTER " + call("getUrlDraft", new Class<?>[0]));
-        tap(W / 2f, H * 0.10f);
-        at(1000, () -> {
-            Log.i(TAG, "READY_PAGE");
-            pollTitle();
+        at(3500, () -> Log.i(TAG, "DRAFT " + call("getUrlDraft", new Class<?>[0])));
+        at(3600, () -> call("sendKey", key, 66, 0));
+        at(4000, () -> {
+            Log.i(TAG, "SUBMITTED " + call("takeSubmittedUrl", new Class<?>[0]));
+            Log.i(TAG, "DRAFT_AFTER " + call("getUrlDraft", new Class<?>[0]));
+            call("takeKeyboardRequest", new Class<?>[0]);  // clear
+            tap(W / 2f, H * 0.10f);
         });
-    }
-
-    private void pollTitle() {
-        Log.i(TAG, "TITLE " + call("getTitle", new Class<?>[0]));
-        at(500, this::pollTitle);
+        at(5000, () -> {
+            Log.i(TAG, "KEYBOARD_REQUESTED " + call("takeKeyboardRequest", new Class<?>[0]));
+            call("sendText", text, "Typed!");
+            call("sendKey", key, 67, 0);  // Del removes "!"
+        });
+        at(6000, () -> Log.i(TAG, "TITLE1 " + call("getTitle", new Class<?>[0])));
+        at(6100, () -> {
+            call("sendKey", key, 29, 0x1000);  // Ctrl+A selects all
+            call("sendText", text, "x");       // replaces the selection
+        });
+        at(7000, () -> {
+            Log.i(TAG, "TITLE2 " + call("getTitle", new Class<?>[0]));
+            Log.i(TAG, "KEYBOARD_DONE");
+        });
     }
 
     private void tap(float x, float y) {
