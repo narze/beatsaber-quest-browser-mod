@@ -14,6 +14,7 @@ bool Init(int width, int height, std::string_view startUrl);
 bool IsReady();
 
 void SetActive(bool active);
+void SetFrameRate(int fps);
 void LoadUrl(std::string_view url);
 void GoBack();
 void GoForward();

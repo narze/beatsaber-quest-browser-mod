@@ -136,4 +136,26 @@ class PointerTracker {
     Pixel last{};
 };
 
+// Counts the browser screens that are visible. The page runs while at least one is.
+// Add() and Remove() return the new running state when it changes, else nullopt.
+class ActiveCounter {
+   public:
+    std::optional<bool> Add() {
+        if (++count == 1) return true;
+        return std::nullopt;
+    }
+    std::optional<bool> Remove() {
+        if (count == 0) return std::nullopt;
+        if (--count == 0) return false;
+        return std::nullopt;
+    }
+    bool IsActive() const { return count > 0; }
+
+   private:
+    int count = 0;
+};
+
+// Page frame rate. It is lower while a song plays, to keep the game smooth.
+inline int FrameRateFor(bool interactive) { return interactive ? 30 : 15; }
+
 }  // namespace QuestBrowser::Logic

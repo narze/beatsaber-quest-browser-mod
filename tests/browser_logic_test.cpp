@@ -95,3 +95,24 @@ TEST_CASE("PointerTracker cancels a press when the pointer leaves") {
     CHECK(tracker.Update(false, Pixel{1.0f, 1.0f}) == PointerAction::None);
     CHECK(tracker.Update(true, Pixel{1.0f, 1.0f}) == PointerAction::Down);
 }
+
+TEST_CASE("ActiveCounter reports a change only on 0 <-> 1 transitions") {
+    ActiveCounter counter;
+    CHECK(counter.Add() == std::optional<bool>(true));
+    CHECK(counter.Add() == std::nullopt);
+    CHECK(counter.Remove() == std::nullopt);
+    CHECK(counter.Remove() == std::optional<bool>(false));
+    CHECK_FALSE(counter.IsActive());
+}
+
+TEST_CASE("ActiveCounter ignores extra removes") {
+    ActiveCounter counter;
+    CHECK(counter.Remove() == std::nullopt);
+    CHECK(counter.Add() == std::optional<bool>(true));
+    CHECK(counter.IsActive());
+}
+
+TEST_CASE("FrameRateFor lowers the rate while a song is playing") {
+    CHECK(FrameRateFor(true) == 30);
+    CHECK(FrameRateFor(false) == 15);
+}

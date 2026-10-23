@@ -2,7 +2,9 @@
 
 #include "HMUI/ViewController.hpp"
 #include "TMPro/TextMeshProUGUI.hpp"
+#include "UnityEngine/CanvasGroup.hpp"
 #include "UnityEngine/MonoBehaviour.hpp"
+#include "UnityEngine/Transform.hpp"
 #include "UnityEngine/Texture2D.hpp"
 #include "UnityEngine/UI/RawImage.hpp"
 #include "VRUIControls/VRPointer.hpp"
@@ -10,12 +12,13 @@
 #include "custom-types/shared/macros.hpp"
 
 // Shows the web page on a RawImage and turns laser pointer input into touches.
-// It is also the BSML host for assets/browser.bsml.
+// It is also the BSML host for the layout in BrowserScreen.cpp.
 DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::RawImage>, pageImage);
     DECLARE_INSTANCE_FIELD(UnityW<TMPro::TextMeshProUGUI>, titleText);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::Texture2D>, texture);
     DECLARE_INSTANCE_FIELD(UnityW<VRUIControls::VRPointer>, pointer);
+    DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::CanvasGroup>, canvasGroup);
     // Bound to the value of the URL keyboard, so that it opens with the current URL.
     DECLARE_INSTANCE_FIELD(StringW, urlValue);
 
@@ -35,8 +38,12 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_DEFAULT_CTOR();
 
    public:
-    // Builds the UI in the view controller. Call once, on first activation.
-    static void CreateIn(HMUI::ViewController* viewController);
+    // Builds the browser UI as a child of parent. parent must be under a Canvas.
+    static BrowserScreen* CreateIn(UnityEngine::Transform* parent);
+
+    // When false, the screen only shows the page: no clicks, no scroll, no buttons.
+    // Used while a song plays.
+    void SetInteractive(bool value);
 
    private:
     void Setup();
@@ -45,6 +52,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     void UpdateLabels();
 
     bool ready = false;
+    bool interactive = true;
+    bool counted = false;
     float labelTimer = 0.0f;
     Logic::PointerTracker tracker;
     bool triggerHeld = false;

@@ -44,7 +44,10 @@ recurse_files(cpp_file_list ${SOURCE_DIR}/*.cpp)
 recurse_files(c_file_list ${SOURCE_DIR}/*.c)
 
 # Add all source files to compilation
-add_library(${COMPILE_ID} SHARED ${cpp_file_list} ${c_file_list})
+# beatsaber-hook 6 ships the inline hook code as source; each mod builds it
+set(INLINE_HOOK_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/extern/includes/beatsaber-hook/shared/inline-hook/And64InlineHook.cpp)
+
+add_library(${COMPILE_ID} SHARED ${cpp_file_list} ${c_file_list} ${INLINE_HOOK_SOURCE})
 
 # Add include directories to compilation
 target_include_directories(${COMPILE_ID} PRIVATE ${INCLUDE_DIR})

@@ -34,6 +34,9 @@ constexpr float kTriggerPress = 0.75f;
 constexpr float kTriggerRelease = 0.35f;
 constexpr float kScrollSpeed = 0.25f;
 
+// Shared by every BrowserScreen: the page runs while any screen is visible.
+Logic::ActiveCounter activeScreens;
+
 constexpr std::string_view kLayout = R"xml(
 <bg>
   <vertical spacing="1" child-expand-height="false" child-control-height="true" anchor-pos-y="2">
@@ -57,10 +60,28 @@ constexpr std::string_view kLayout = R"xml(
 
 }  // namespace
 
-void BrowserScreen::CreateIn(HMUI::ViewController* viewController) {
-    auto screen = viewController->gameObject->AddComponent<BrowserScreen*>();
-    BSML::parse_and_construct(kLayout, viewController->transform, screen);
+BrowserScreen* BrowserScreen::CreateIn(Transform* parent) {
+    auto go = parent->gameObject;
+    auto screen = go->AddComponent<BrowserScreen*>();
+    screen->canvasGroup = go->GetComponent<CanvasGroup*>();
+    if (!screen->canvasGroup) screen->canvasGroup = go->AddComponent<CanvasGroup*>();
+    BSML::parse_and_construct(kLayout, parent, screen);
     screen->Setup();
+    return screen;
+}
+
+void BrowserScreen::SetInteractive(bool value) {
+    interactive = value;
+    if (canvasGroup) canvasGroup->blocksRaycasts = value;
+    if (!value && tracker.IsDown()) {
+        auto p = tracker.LastPixel();
+        Jni::Touch(3, p.x, p.y);
+    }
+    if (!value) {
+        tracker = {};
+        triggerHeld = false;
+    }
+    if (ready && isActiveAndEnabled) Jni::SetFrameRate(Logic::FrameRateFor(value));
 }
 
 void BrowserScreen::Setup() {
@@ -82,15 +103,21 @@ void BrowserScreen::Setup() {
         if (titleText) titleText->text = "Browser failed to start. See the log for details.";
         return;
     }
-    Jni::SetActive(isActiveAndEnabled);
+    OnEnable();
 }
 
 void BrowserScreen::OnEnable() {
-    if (ready) Jni::SetActive(true);
+    if (!ready || counted || !isActiveAndEnabled) return;
+    counted = true;
+    if (auto change = activeScreens.Add()) Jni::SetActive(*change);
+    Jni::SetFrameRate(Logic::FrameRateFor(interactive));
 }
 
 void BrowserScreen::OnDisable() {
-    if (ready) Jni::SetActive(false);
+    if (counted) {
+        counted = false;
+        if (auto change = activeScreens.Remove()) Jni::SetActive(*change);
+    }
     // Do not leave a touch held down when the menu closes.
     if (tracker.IsDown()) {
         auto p = tracker.LastPixel();
@@ -118,8 +145,9 @@ void BrowserScreen::UpdateTexture() {
 }
 
 void BrowserScreen::UpdateInput() {
-    if (!pageImage) return;
-    if (!pointer) {
+    if (!pageImage || !interactive) return;
+    // Each scene has its own pointer; find it again when the old one is gone or disabled.
+    if (!pointer || !pointer->isActiveAndEnabled) {
         pointer = Object::FindAnyObjectByType<VRUIControls::VRPointer*>();
         if (!pointer) return;
     }
