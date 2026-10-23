@@ -162,6 +162,25 @@ public final class BrowserBridge {
             public void onProgressChanged(WebView view, int p) {
                 progress = p;
             }
+
+            // A page asked for fullscreen (for example the video player). WebView gives us
+            // a view with the fullscreen content; we draw it, and send input to it, instead
+            // of the page until the page leaves fullscreen.
+            @Override
+            public void onShowCustomView(View view, CustomViewCallback callback) {
+                if (customView != null) exitFullscreen();
+                customView = view;
+                customViewCallback = callback;
+                container.addView(view, new FrameLayout.LayoutParams(width, height));
+                layout();
+                view.requestFocus();
+                Log.i(TAG, "Fullscreen on");
+            }
+
+            @Override
+            public void onHideCustomView() {
+                removeCustomView();
+            }
         });
 
         // Chromium only runs timers and animations for a WebView that is in a
@@ -247,6 +266,41 @@ public final class BrowserBridge {
         int hs = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY);
         webView.measure(ws, hs);
         webView.layout(0, 0, width, height);
+        if (customView != null) {
+            customView.measure(ws, hs);
+            customView.layout(0, 0, width, height);
+        }
+    }
+
+    // ---- Fullscreen ------------------------------------------------------
+
+    private static View customView;
+    private static WebChromeClient.CustomViewCallback customViewCallback;
+
+    /** The view to draw and to send input to: the fullscreen view if there is one, else the page. */
+    private static View target() {
+        return customView != null ? customView : webView;
+    }
+
+    private static void removeCustomView() {
+        if (customView == null) return;
+        container.removeView(customView);
+        customView = null;
+        customViewCallback = null;
+        webView.requestFocus();
+        Log.i(TAG, "Fullscreen off");
+    }
+
+    /** True while a page shows fullscreen content. */
+    public static boolean isFullscreen() {
+        return customView != null;
+    }
+
+    /** Asks the page to leave fullscreen. WebView then calls onHideCustomView. */
+    private static void exitFullscreen() {
+        WebChromeClient.CustomViewCallback callback = customViewCallback;
+        if (callback != null) callback.onCustomViewHidden();
+        removeCustomView();
     }
 
     /** Starts or stops page rendering, timers, and media. */
@@ -373,15 +427,19 @@ public final class BrowserBridge {
     }
 
     private static void drawFrame() {
-        if (webView.getWidth() != width || webView.getHeight() != height) layout();
+        if (webView.getWidth() != width || webView.getHeight() != height
+                || (customView != null && (customView.getWidth() != width || customView.getHeight() != height))) {
+            layout();
+        }
         if (hardwareRender) {
             try {
                 Canvas c = readerSurface.lockHardwareCanvas();
                 try {
                     c.drawColor(Color.WHITE);
                     // WebView draws its scroll position as a canvas translation.
-                    c.translate(-webView.getScrollX(), -webView.getScrollY());
-                    webView.draw(c);
+                    View v = target();
+                    c.translate(-v.getScrollX(), -v.getScrollY());
+                    v.draw(c);
                 } finally {
                     readerSurface.unlockCanvasAndPost(c);
                 }
@@ -398,8 +456,9 @@ public final class BrowserBridge {
         bitmap.eraseColor(0xFFFFFFFF);
         // WebView draws its scroll position as a canvas translation.
         int save = canvas.save();
-        canvas.translate(-webView.getScrollX(), -webView.getScrollY());
-        webView.draw(canvas);
+        View v = target();
+        canvas.translate(-v.getScrollX(), -v.getScrollY());
+        v.draw(canvas);
         canvas.restoreToCount(save);
 
         synchronized (frameLock) {
@@ -479,6 +538,7 @@ public final class BrowserBridge {
         post(new Runnable() {
             @Override
             public void run() {
+                if (customView != null) exitFullscreen();
                 webView.loadUrl(url);
             }
         });
@@ -488,7 +548,9 @@ public final class BrowserBridge {
         post(new Runnable() {
             @Override
             public void run() {
-                if (webView.canGoBack()) webView.goBack();
+                // Back leaves fullscreen first, like on a phone.
+                if (customView != null) exitFullscreen();
+                else if (webView.canGoBack()) webView.goBack();
             }
         });
     }
@@ -531,13 +593,14 @@ public final class BrowserBridge {
             @Override
             public void run() {
                 long now = SystemClock.uptimeMillis();
+                View t = target();
                 if (action == MotionEvent.ACTION_DOWN) {
                     downTime = now;
-                    if (!webView.hasFocus()) webView.requestFocus();
+                    if (!t.hasFocus()) t.requestFocus();
                 }
                 MotionEvent e = MotionEvent.obtain(downTime, now, action, x, y, 0);
                 e.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-                webView.dispatchTouchEvent(e);
+                t.dispatchTouchEvent(e);
                 e.recycle();
                 if (action == MotionEvent.ACTION_UP) ui.postDelayed(BrowserBridge::showImeIfEditableFocused, 150);
             }
@@ -623,8 +686,12 @@ public final class BrowserBridge {
                     endUrlEditing();
                     return;
                 }
-                View target = editingUrl ? urlField : webView;
-                if (target == webView && !webView.hasFocus()) webView.requestFocus();
+                if (customView != null && keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                    exitFullscreen();
+                    return;
+                }
+                View target = editingUrl ? urlField : target();
+                if (target != urlField && !target.hasFocus()) target.requestFocus();
                 long now = SystemClock.uptimeMillis();
                 target.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, metaState));
                 target.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, metaState));
@@ -657,7 +724,7 @@ public final class BrowserBridge {
                 long now = SystemClock.uptimeMillis();
                 MotionEvent e = MotionEvent.obtain(now, now, MotionEvent.ACTION_SCROLL, 1, props, coords,
                         0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0);
-                webView.dispatchGenericMotionEvent(e);
+                target().dispatchGenericMotionEvent(e);
                 e.recycle();
             }
         });

@@ -48,6 +48,24 @@ public class HarnessActivity extends Activity {
             runKeyboardTest();
             return;
         }
+        if ("fullscreen".equals(getIntent().getStringExtra("mode"))) {
+            call("setFrameRate", new Class<?>[] {int.class}, 60);
+            call("loadUrl", new Class<?>[] {String.class}, "file:///android_asset/video.html");
+            whenTitle("playing", () -> {
+                at(1000, () -> measureFps("FS_FPS_BEFORE"));
+                at(3500, () -> tap(W * 0.25f, H * 0.25f));
+                at(5500, () -> {
+                    Log.i(TAG, "FS_STATE " + call("isFullscreen", new Class<?>[0]));
+                    measureFps("FS_FPS_AFTER");
+                });
+                at(8000, () -> {
+                    Log.i(TAG, "FS_MAGENTA " + magentaFraction());
+                    saveFrame("fullscreen.png");
+                    Log.i(TAG, "FS_DONE");
+                });
+            });
+            return;
+        }
         if ("video".equals(getIntent().getStringExtra("mode"))) {
             call("loadUrl", new Class<?>[] {String.class}, "file:///android_asset/video.html");
             at(6500, () -> saveFrame("video.png"));
@@ -63,18 +81,21 @@ public class HarnessActivity extends Activity {
         final float inputX = W / 2f, inputY = H * 0.10f;
         final float buttonX = W / 2f, buttonY = H * 0.40f;
 
-        at(3000, () -> {
+        // Start when test.html has loaded, so that a slow first start does not lose the taps.
+        whenTitle("ready", () -> {
+        at(500, () -> {
             saveFrame("frame1.png");
             tap(inputX, inputY);
         });
-        at(4000, () -> call("typeText", new Class<?>[] {String.class}, "hello quest"));
-        at(5000, () -> tap(buttonX, buttonY));
-        at(6000, () -> call("scroll", new Class<?>[] {float.class, float.class, float.class}, W / 2f, H * 0.8f, -5f));
-        at(8000, () -> {
+        at(1500, () -> call("typeText", new Class<?>[] {String.class}, "hello quest"));
+        at(2500, () -> tap(buttonX, buttonY));
+        at(3500, () -> call("scroll", new Class<?>[] {float.class, float.class, float.class}, W / 2f, H * 0.8f, -5f));
+        at(5500, () -> {
             saveFrame("frame2.png");
             Log.i(TAG, "TITLE " + call("getTitle", new Class<?>[0]));
             Log.i(TAG, "URL " + call("getUrl", new Class<?>[0]));
             Log.i(TAG, "DONE");
+        });
         });
     }
 
@@ -114,6 +135,23 @@ public class HarnessActivity extends Activity {
         });
     }
 
+    /** Counts new frames from the bridge for 2 seconds on a background thread, then logs "label fps". */
+    private void measureFps(String label) {
+        new Thread(() -> {
+            int frames = 0;
+            long end = android.os.SystemClock.uptimeMillis() + 2000;
+            while (android.os.SystemClock.uptimeMillis() < end) {
+                Object buf = call("acquireFrame", new Class<?>[0]);
+                if (buf != null) {
+                    frames++;
+                    call("releaseFrame", new Class<?>[0]);
+                }
+                try { Thread.sleep(4); } catch (InterruptedException ignored) {}
+            }
+            Log.i(TAG, label + " " + (frames / 2));
+        }).start();
+    }
+
     /** Share of pixels in the newest frame that are close to magenta (255, 0, 255). */
     private String magentaFraction() {
         ByteBuffer buf = (ByteBuffer) call("acquireFrame", new Class<?>[0]);
@@ -137,6 +175,19 @@ public class HarnessActivity extends Activity {
         } finally {
             call("releaseFrame", new Class<?>[0]);
         }
+    }
+
+    /** Runs r once the page title is title (checks every 200 ms, up to 20 s). */
+    private void whenTitle(String title, Runnable r) {
+        whenTitle(title, r, 100);
+    }
+
+    private void whenTitle(String title, Runnable r, int triesLeft) {
+        if (title.equals(call("getTitle", new Class<?>[0])) || triesLeft == 0) {
+            r.run();
+            return;
+        }
+        at(200, () -> whenTitle(title, r, triesLeft - 1));
     }
 
     private void tap(float x, float y) {

@@ -82,6 +82,23 @@ grep -q "FAIL" "$OUT/logcat-video.txt" && { echo "FAIL: harness reported a failu
 frac=$(grep -o "VIDEO_MAGENTA [0-9.]*" "$OUT/logcat-video.txt" | awk '{print $2}')
 awk -v f="${frac:-0}" 'BEGIN { exit !(f >= 0.5) }' || { echo "FAIL: video frames are not drawn (magenta share ${frac:-none}, want >= 0.5)"; vid=1; }
 
+echo "== Fullscreen test"
+adb logcat -c
+adb shell am force-stop "$PKG"
+adb shell am start -n "$PKG/.HarnessActivity" --es mode fullscreen >/dev/null
+fs=0
+waitlog "FS_DONE" || { echo "FAIL: fullscreen test did not finish"; fs=1; }
+adb logcat -d -s QBHarness:* QuestBrowser:* | tee "$OUT/logcat-fullscreen.txt" | grep -E "FS_|Fullscreen"
+adb pull "$DIR/fullscreen.png" "$OUT/fullscreen.png" >/dev/null 2>&1 || true
+grep -q "FS_STATE true" "$OUT/logcat-fullscreen.txt" || { echo "FAIL: page did not enter fullscreen"; fs=1; }
+before=$(grep -o "FS_FPS_BEFORE [0-9]*" "$OUT/logcat-fullscreen.txt" | awk '{print $2}')
+after=$(grep -o "FS_FPS_AFTER [0-9]*" "$OUT/logcat-fullscreen.txt" | awk '{print $2}')
+# The emulator frame rate varies by about 25% from run to run; a real problem is a much larger drop.
+awk -v a="${after:-0}" -v b="${before:-0}" 'BEGIN { exit !(a >= 20 && a >= b * 0.6) }' \
+    || { echo "FAIL: frame rate dropped in fullscreen (before ${before:-none}/s, after ${after:-none}/s)"; fs=1; }
+fmag=$(grep -o "FS_MAGENTA [0-9.]*" "$OUT/logcat-fullscreen.txt" | awk '{print $2}')
+awk -v f="${fmag:-0}" 'BEGIN { exit !(f >= 0.5) }' || { echo "FAIL: video not drawn in fullscreen (magenta ${fmag:-none})"; fs=1; }
+
 echo "== Check"
 fail=0
 grep -q "FAIL" "$OUT/logcat.txt" && { echo "FAIL: harness reported a failure"; fail=1; }
@@ -91,5 +108,6 @@ grep -q "TITLE clicks=1 text=hello quest y=[1-9]" "$OUT/logcat.txt" \
 echo "Frames: $OUT/frame1.png $OUT/frame2.png"
 [ $kb -eq 0 ] || fail=1
 [ $vid -eq 0 ] || fail=1
+[ $fs -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "PASS"
 exit $fail

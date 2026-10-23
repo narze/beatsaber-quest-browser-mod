@@ -19,6 +19,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - Tap a text field on the page to open the keyboard, or press **Keyboard**. **Hide** closes it.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
    - **<**, **>**, **Reload**, **Home** work like in a desktop browser.
+   - Fullscreen video fills the browser window. **<** or **Esc** leaves fullscreen.
 4. Mod settings > **Browser**: show the window during songs or not, and reset the positions.
 
 The page stops (timers, video, audio) while the window is hidden. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.

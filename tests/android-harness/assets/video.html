@@ -11,10 +11,16 @@
 <body>
 <!-- A solid magenta video. If the browser draws video frames, the page is magenta, else black. -->
 <video src="magenta.mp4" autoplay muted loop playsinline></video>
+<!-- Covers the top-left quarter. The fullscreen test taps it. -->
+<button id="fs" style="position:fixed;left:0;top:0;width:50vw;height:50vh;opacity:0.01"
+        onclick="document.querySelector('video').requestFullscreen()">Fullscreen</button>
 <script>
   var v = document.querySelector('video');
   v.addEventListener('playing', function () { document.title = 'playing'; });
   v.addEventListener('error', function () { document.title = 'error ' + (v.error && v.error.code); });
+  document.addEventListener('fullscreenchange', function () {
+    document.title = document.fullscreenElement ? 'fullscreen' : 'playing';
+  });
 </script>
 </body>
 </html>
