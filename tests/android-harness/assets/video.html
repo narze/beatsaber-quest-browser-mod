@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>video</title>
+<style>
+  html, body { margin: 0; background: #000; }
+  video { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; object-fit: fill; }
+</style>
+</head>
+<body>
+<!-- A solid magenta video. If the browser draws video frames, the page is magenta, else black. -->
+<video src="magenta.mp4" autoplay muted loop playsinline></video>
+<script>
+  var v = document.querySelector('video');
+  v.addEventListener('playing', function () { document.title = 'playing'; });
+  v.addEventListener('error', function () { document.title = 'error ' + (v.error && v.error.code); });
+</script>
+</body>
+</html>

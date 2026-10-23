@@ -4,7 +4,8 @@
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="32" />
     <uses-permission android:name="android.permission.INTERNET" />
     <application android:label="QB Harness" android:hardwareAccelerated="true">
-        <activity android:name=".HarnessActivity" android:exported="true">
+        <!-- Same as Beat Saber's UnityPlayerActivity: no hardware acceleration for the window. -->
+        <activity android:name=".HarnessActivity" android:exported="true" android:hardwareAccelerated="false">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

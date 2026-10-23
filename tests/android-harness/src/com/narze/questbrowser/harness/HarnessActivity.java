@@ -48,6 +48,16 @@ public class HarnessActivity extends Activity {
             runKeyboardTest();
             return;
         }
+        if ("video".equals(getIntent().getStringExtra("mode"))) {
+            call("loadUrl", new Class<?>[] {String.class}, "file:///android_asset/video.html");
+            at(6500, () -> saveFrame("video.png"));
+            at(7000, () -> {
+                Log.i(TAG, "VIDEO_TITLE " + call("getTitle", new Class<?>[0]));
+                Log.i(TAG, "VIDEO_MAGENTA " + magentaFraction());
+                Log.i(TAG, "VIDEO_DONE");
+            });
+            return;
+        }
 
         // Centers of the elements in test.html, in page pixels.
         final float inputX = W / 2f, inputY = H * 0.10f;
@@ -102,6 +112,31 @@ public class HarnessActivity extends Activity {
             Log.i(TAG, "TITLE2 " + call("getTitle", new Class<?>[0]));
             Log.i(TAG, "KEYBOARD_DONE");
         });
+    }
+
+    /** Share of pixels in the newest frame that are close to magenta (255, 0, 255). */
+    private String magentaFraction() {
+        ByteBuffer buf = (ByteBuffer) call("acquireFrame", new Class<?>[0]);
+        if (buf == null) {
+            // No new frame since the last one; wait for the next one.
+            try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+            buf = (ByteBuffer) call("acquireFrame", new Class<?>[0]);
+            if (buf == null) return "noframe";
+        }
+        try {
+            int magenta = 0, total = 0;
+            for (int y = 0; y < H; y += 8) {
+                for (int x = 0; x < W; x += 8) {
+                    int i = (y * W + x) * 4;
+                    int r = buf.get(i) & 0xFF, g = buf.get(i + 1) & 0xFF, b = buf.get(i + 2) & 0xFF;
+                    if (r > 180 && g < 90 && b > 180) magenta++;
+                    total++;
+                }
+            }
+            return String.format(java.util.Locale.US, "%.2f", magenta / (float) total);
+        } finally {
+            call("releaseFrame", new Class<?>[0]);
+        }
     }
 
     private void tap(float x, float y) {

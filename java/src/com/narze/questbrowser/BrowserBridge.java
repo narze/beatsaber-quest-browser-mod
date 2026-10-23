@@ -5,7 +5,13 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
+import android.hardware.HardwareBuffer;
+import android.media.Image;
+import android.media.ImageReader;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.Editable;
@@ -16,6 +22,7 @@ import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.Surface;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
@@ -61,6 +68,15 @@ public final class BrowserBridge {
     private static FrameLayout container;
     private static Bitmap bitmap;
     private static Canvas canvas;
+
+    // Hardware path: the WebView draws with the GPU into an ImageReader surface, and a
+    // copy thread moves each image into the frame buffers. Only this path shows video,
+    // because Chromium decodes video on the GPU. If it fails, we use the software
+    // path (draw into a Bitmap), which shows pages but not video.
+    private static boolean hardwareRender = true;
+    private static ImageReader reader;
+    private static Surface readerSurface;
+    private static HandlerThread copyThread;
     private static long downTime;
 
     // Hidden address field. The in-game keyboard types into it; the native side
@@ -108,7 +124,6 @@ public final class BrowserBridge {
         }
 
         webView = new WebView(ctx);
-        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         webView.setFocusable(true);
         webView.setFocusableInTouchMode(true);
         webView.setVerticalScrollBarEnabled(true);
@@ -161,6 +176,7 @@ public final class BrowserBridge {
 
         bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         canvas = new Canvas(bitmap);
+        createReader();
 
         webView.loadUrl(startUrl);
         Log.i(TAG, "WebView created " + width + "x" + height + " in " + ctx.getClass().getName());
@@ -277,8 +293,59 @@ public final class BrowserBridge {
         }
     };
 
+    private static void createReader() {
+        try {
+            reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 3,
+                    HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_GPU_COLOR_OUTPUT);
+            copyThread = new HandlerThread("QuestBrowserCopy");
+            copyThread.start();
+            reader.setOnImageAvailableListener(r -> {
+                Image image = r.acquireLatestImage();
+                if (image == null) return;
+                try {
+                    copyImage(image);
+                } finally {
+                    image.close();
+                }
+            }, new Handler(copyThread.getLooper()));
+            readerSurface = reader.getSurface();
+        } catch (Throwable t) {
+            Log.w(TAG, "ImageReader not available, using software rendering", t);
+            useSoftwareRender();
+        }
+    }
+
+    private static void useSoftwareRender() {
+        hardwareRender = false;
+        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        Log.i(TAG, "Render path: software (no video)");
+    }
+
+    private static boolean loggedHardware;
+
     private static void drawFrame() {
         if (webView.getWidth() != width || webView.getHeight() != height) layout();
+        if (hardwareRender) {
+            try {
+                Canvas c = readerSurface.lockHardwareCanvas();
+                try {
+                    c.drawColor(Color.WHITE);
+                    // WebView draws its scroll position as a canvas translation.
+                    c.translate(-webView.getScrollX(), -webView.getScrollY());
+                    webView.draw(c);
+                } finally {
+                    readerSurface.unlockCanvasAndPost(c);
+                }
+                if (!loggedHardware) {
+                    loggedHardware = true;
+                    Log.i(TAG, "Render path: hardware");
+                }
+                return;
+            } catch (Throwable t) {
+                Log.w(TAG, "Hardware rendering failed", t);
+                useSoftwareRender();
+            }
+        }
         bitmap.eraseColor(0xFFFFFFFF);
         // WebView draws its scroll position as a canvas translation.
         int save = canvas.save();
@@ -289,6 +356,37 @@ public final class BrowserBridge {
         synchronized (frameLock) {
             back.rewind();
             bitmap.copyPixelsToBuffer(back);
+            if (!frontLocked) {
+                ByteBuffer t = front;
+                front = back;
+                back = t;
+                frameSeq++;
+            }
+        }
+    }
+
+    /** Copy thread: moves an RGBA image into the back buffer, then swaps it to the front. */
+    private static void copyImage(Image image) {
+        Image.Plane plane = image.getPlanes()[0];
+        ByteBuffer src = plane.getBuffer();
+        int rowStride = plane.getRowStride();
+        int rowBytes = width * 4;
+        synchronized (frameLock) {
+            back.rewind();
+            if (rowStride == rowBytes) {
+                ByteBuffer all = src.duplicate();
+                all.limit(Math.min(all.capacity(), rowBytes * height));
+                back.put(all);
+            } else {
+                // Rows can have padding at the end; copy the pixels of each row only.
+                ByteBuffer row = src.duplicate();
+                for (int y = 0; y < height; y++) {
+                    row.limit(y * rowStride + rowBytes);
+                    row.position(y * rowStride);
+                    back.put(row);
+                }
+            }
+            back.rewind();
             if (!frontLocked) {
                 ByteBuffer t = front;
                 front = back;

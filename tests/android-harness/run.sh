@@ -70,6 +70,18 @@ for want in "DRAFT example.org/page" "SUBMITTED example.org/page" "DRAFT_AFTER n
 done
 adb logcat -d -s QBHarness:* QuestBrowser:* | tee "$OUT/logcat-keyboard.txt"
 
+echo "== Video test"
+adb logcat -c
+adb shell am force-stop "$PKG"
+adb shell am start -n "$PKG/.HarnessActivity" --es mode video >/dev/null
+vid=0
+waitlog "VIDEO_DONE" || { echo "FAIL: video test did not finish"; vid=1; }
+adb logcat -d -s QBHarness:* QuestBrowser:* | tee "$OUT/logcat-video.txt" | grep -E "VIDEO|render"
+adb pull "$DIR/video.png" "$OUT/video.png" >/dev/null 2>&1 || true
+grep -q "FAIL" "$OUT/logcat-video.txt" && { echo "FAIL: harness reported a failure in the video test"; vid=1; }
+frac=$(grep -o "VIDEO_MAGENTA [0-9.]*" "$OUT/logcat-video.txt" | awk '{print $2}')
+awk -v f="${frac:-0}" 'BEGIN { exit !(f >= 0.5) }' || { echo "FAIL: video frames are not drawn (magenta share ${frac:-none}, want >= 0.5)"; vid=1; }
+
 echo "== Check"
 fail=0
 grep -q "FAIL" "$OUT/logcat.txt" && { echo "FAIL: harness reported a failure"; fail=1; }
@@ -78,5 +90,6 @@ grep -q "TITLE clicks=1 text=hello quest y=[1-9]" "$OUT/logcat.txt" \
 [ -s "$OUT/frame1.png" ] && [ -s "$OUT/frame2.png" ] || { echo "FAIL: frames missing"; fail=1; }
 echo "Frames: $OUT/frame1.png $OUT/frame2.png"
 [ $kb -eq 0 ] || fail=1
+[ $vid -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "PASS"
 exit $fail
