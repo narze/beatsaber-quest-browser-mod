@@ -56,4 +56,10 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     float labelTimer = 0.0f;
     Logic::PointerTracker tracker;
     bool triggerHeld = false;
+    struct UploadStats {
+        int frames = 0;
+        int uploads = 0;
+        float seconds = 0.0f;
+        float uploadMs = 0.0f;
+    } uploadStats;
 };

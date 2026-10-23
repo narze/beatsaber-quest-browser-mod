@@ -21,7 +21,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - **<**, **>**, **Reload**, **Home** work like in a desktop browser.
 4. Mod settings > **Browser**: show the window during songs or not, and reset the positions.
 
-The page stops (timers, video, audio) while the window is hidden. In songs it updates at 15 fps to keep the game smooth.
+The page stops (timers, video, audio) while the window is hidden. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
 
 ## How it works
 
@@ -73,8 +73,8 @@ tests/android-harness/run.sh
 
 ## Known limits
 
-- Video plays in software draw mode, so it can be slow or black. Text pages and most web apps work.
-- The page is 1280 x 720 at 30 fps. Increase the size for sharper text, or decrease it for better frame rate.
+- Video plays at the page frame rate (60 fps in the menu, 30 fps in songs). Protected video (DRM) may stay black.
+- The page is 1280 x 720. Increase the size for sharper text.
 - The Quest system keyboard can not show over Beat Saber (the game does not declare `oculus.software.overlay_keyboard`), so the mod draws its own keyboard. Text with no key on a US keyboard is typed with JavaScript, which some pages ignore.
 - Solo songs only. The window does not show in multiplayer.
 

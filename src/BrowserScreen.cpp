@@ -10,6 +10,8 @@
 #include "UnityEngine/TextureFormat.hpp"
 #include "UnityEngine/TextureWrapMode.hpp"
 #include "UnityEngine/Time.hpp"
+
+#include <chrono>
 #include "UnityEngine/Transform.hpp"
 #include "bsml/shared/BSML.hpp"
 #include "main.hpp"
@@ -92,7 +94,15 @@ void BrowserScreen::Setup() {
         logger.error("BSML did not bind pageImage");
     }
 
+#ifdef QB_DEBUG_YOUTUBE_ID
+    // Debug builds (qpm s build -D QB_DEBUG_YOUTUBE_ID=<video id>): start on that video, for
+    // performance measurements.
+#define QB_STR2(x) #x
+#define QB_STR(x) QB_STR2(x)
+    ready = Jni::Init(kPageWidth, kPageHeight, "https://www.youtube.com/embed/" QB_STR(QB_DEBUG_YOUTUBE_ID) "?autoplay=1");
+#else
     ready = Jni::Init(kPageWidth, kPageHeight, Logic::kHomeUrl);
+#endif
     if (!ready) {
         if (titleText) titleText->text = "Browser failed to start. See the log for details.";
         return;
@@ -136,12 +146,27 @@ void BrowserScreen::Update() {
 
 void BrowserScreen::UpdateTexture() {
     if (!texture) return;
+    auto start = std::chrono::steady_clock::now();
     bool updated = Jni::ConsumeFrame([this](void* pixels, std::size_t size) {
         std::size_t expected = static_cast<std::size_t>(kPageWidth) * kPageHeight * 4;
         if (size < expected) return;
         texture->LoadRawTextureData(System::IntPtr(pixels), static_cast<int>(expected));
     });
     if (updated) texture->Apply(false);
+
+    // Performance counters, logged every 30 seconds.
+    auto& st = uploadStats;
+    st.frames++;
+    st.seconds += Time::get_unscaledDeltaTime();
+    if (updated) {
+        st.uploads++;
+        st.uploadMs += std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - start).count();
+    }
+    if (st.seconds >= 30.0f) {
+        logger.info("Stats: game {:.1f} fps, uploads {:.1f}/s avg {:.2f} ms", st.frames / st.seconds, st.uploads / st.seconds,
+                    st.uploads ? st.uploadMs / st.uploads : 0.0f);
+        st = {};
+    }
 }
 
 void BrowserScreen::UpdateInput() {

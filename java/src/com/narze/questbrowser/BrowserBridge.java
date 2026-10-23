@@ -18,6 +18,7 @@ import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Choreographer;
 import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
@@ -166,7 +167,14 @@ public final class BrowserBridge {
         // Chromium only runs timers and animations for a WebView that is in a
         // window. The window of a VR app is not shown in the headset, so we put
         // the view in it and draw it ourselves.
-        container = new FrameLayout(ctx);
+        container = new FrameLayout(ctx) {
+            @Override
+            protected void dispatchDraw(Canvas c) {
+                // The window of a VR app is not shown, and Beat Saber's window draws in
+                // software: drawing the page there would cost a CPU redraw for nothing.
+                // We draw the page ourselves in drawFrame().
+            }
+        };
         container.addView(webView, new FrameLayout.LayoutParams(width, height));
         if (ctx instanceof Activity) {
             ((Activity) ctx).addContentView(container, new ViewGroup.LayoutParams(width, height));
@@ -272,24 +280,35 @@ public final class BrowserBridge {
     private static void startRenderLoop() {
         if (loopRunning) return;
         loopRunning = true;
-        ui.post(renderTick);
+        nextFrameNanos = 0;
+        Choreographer.getInstance().postFrameCallback(renderTick);
     }
 
-    private static final Runnable renderTick = new Runnable() {
+    private static long nextFrameNanos;
+
+    // Runs on each display vsync and draws when the next frame at the target rate is due,
+    // so frames come at even times.
+    private static final Choreographer.FrameCallback renderTick = new Choreographer.FrameCallback() {
         @Override
-        public void run() {
+        public void doFrame(long frameTimeNanos) {
             if (!active || webView == null) {
                 loopRunning = false;
                 return;
             }
-            long start = SystemClock.uptimeMillis();
-            try {
-                drawFrame();
-            } catch (Throwable t) {
-                Log.e(TAG, "drawFrame failed", t);
+            long interval = frameIntervalMs * 1_000_000L;
+            // Draw up to half a 90 Hz vsync early, else 60 fps would round down to 45.
+            if (frameTimeNanos >= nextFrameNanos - 5_500_000L) {
+                // After a stall, start again from now instead of drawing a burst.
+                nextFrameNanos = Math.max(nextFrameNanos + interval, frameTimeNanos);
+                long start = SystemClock.uptimeMillis();
+                try {
+                    drawFrame();
+                } catch (Throwable t) {
+                    Log.e(TAG, "drawFrame failed", t);
+                }
+                stats(SystemClock.uptimeMillis() - start);
             }
-            long spent = SystemClock.uptimeMillis() - start;
-            ui.postDelayed(this, Math.max(1, frameIntervalMs - spent));
+            Choreographer.getInstance().postFrameCallback(this);
         }
     };
 
@@ -302,8 +321,11 @@ public final class BrowserBridge {
             reader.setOnImageAvailableListener(r -> {
                 Image image = r.acquireLatestImage();
                 if (image == null) return;
+                long t0 = SystemClock.elapsedRealtimeNanos();
                 try {
                     copyImage(image);
+                    copies++;
+                    copyNanos += SystemClock.elapsedRealtimeNanos() - t0;
                 } finally {
                     image.close();
                 }
@@ -322,6 +344,33 @@ public final class BrowserBridge {
     }
 
     private static boolean loggedHardware;
+
+    // Performance counters, logged every 30 seconds while the page runs.
+    private static volatile int copies;
+    private static volatile long copyNanos;
+    private static int draws;
+    private static long drawMillis;
+    private static long statsStart;
+
+    private static void stats(long drawMs) {
+        draws++;
+        drawMillis += drawMs;
+        long now = SystemClock.uptimeMillis();
+        if (statsStart == 0) statsStart = now;
+        long span = now - statsStart;
+        if (span < 30000) return;
+        float sec = span / 1000f;
+        Log.i(TAG, String.format(java.util.Locale.US,
+                "Stats: draw %.1f/s avg %.1f ms, copy %.1f/s avg %.1f ms, path %s",
+                draws / sec, draws == 0 ? 0f : drawMillis / (float) draws,
+                copies / sec, copies == 0 ? 0f : copyNanos / 1e6f / copies,
+                hardwareRender ? "hardware" : "software"));
+        draws = 0;
+        drawMillis = 0;
+        copies = 0;
+        copyNanos = 0;
+        statsStart = now;
+    }
 
     private static void drawFrame() {
         if (webView.getWidth() != width || webView.getHeight() != height) layout();
