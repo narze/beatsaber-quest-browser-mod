@@ -27,7 +27,8 @@ constexpr char const* kBridgeClass = "com.narze.questbrowser.BrowserBridge";
 struct Methods {
     jclass cls = nullptr;
     jmethodID init, setActive, setFrameRate, loadUrl, goBack, goForward, reload;
-    jmethodID touch, scroll, typeText, pressKey;
+    jmethodID touch, scroll, pressKey;
+    jmethodID showUrlKeyboard, showPageKeyboard, hideKeyboard, getUrlDraft, takeSubmittedUrl;
     jmethodID getUrl, getTitle, getProgress;
     jmethodID acquireFrame, releaseFrame;
 };
@@ -149,7 +150,11 @@ bool LookupMethods(JNIEnv* env) {
            get(m.reload, "reload", "()V") &&
            get(m.touch, "touch", "(IFF)V") &&
            get(m.scroll, "scroll", "(FFF)V") &&
-           get(m.typeText, "typeText", "(Ljava/lang/String;)V") &&
+           get(m.showUrlKeyboard, "showUrlKeyboard", "(Ljava/lang/String;)V") &&
+           get(m.showPageKeyboard, "showPageKeyboard", "()V") &&
+           get(m.hideKeyboard, "hideKeyboard", "()V") &&
+           get(m.getUrlDraft, "getUrlDraft", "()Ljava/lang/String;") &&
+           get(m.takeSubmittedUrl, "takeSubmittedUrl", "()Ljava/lang/String;") &&
            get(m.pressKey, "pressKey", "(I)V") &&
            get(m.getUrl, "getUrl", "()Ljava/lang/String;") &&
            get(m.getTitle, "getTitle", "()Ljava/lang/String;") &&
@@ -177,14 +182,16 @@ void CallWithString(char const* where, jmethodID method, std::string_view text) 
     CheckException(env, where);
 }
 
-std::string CallString(char const* where, jmethodID method) {
-    if (!ready) return {};
+std::optional<std::string> CallOptionalString(char const* where, jmethodID method) {
+    if (!ready) return std::nullopt;
     JNIEnv* env = GetEnv();
-    if (!env) return {};
+    if (!env) return std::nullopt;
     auto str = static_cast<jstring>(env->CallStaticObjectMethod(m.cls, method));
-    if (CheckException(env, where)) return {};
+    if (CheckException(env, where) || !str) return std::nullopt;
     return ToStdString(env, str);
 }
+
+std::string CallString(char const* where, jmethodID method) { return CallOptionalString(where, method).value_or(""); }
 
 }  // namespace
 
@@ -234,8 +241,13 @@ void Scroll(float x, float y, float amount) {
     CallVoid("scroll", m.scroll, static_cast<jfloat>(x), static_cast<jfloat>(y), static_cast<jfloat>(amount));
 }
 
-void TypeText(std::string_view text) { CallWithString("typeText", m.typeText, text); }
 void PressKey(int androidKeyCode) { CallVoid("pressKey", m.pressKey, static_cast<jint>(androidKeyCode)); }
+
+void ShowUrlKeyboard(std::string_view currentUrl) { CallWithString("showUrlKeyboard", m.showUrlKeyboard, currentUrl); }
+void ShowPageKeyboard() { CallVoid("showPageKeyboard", m.showPageKeyboard); }
+void HideKeyboard() { CallVoid("hideKeyboard", m.hideKeyboard); }
+std::optional<std::string> GetUrlDraft() { return CallOptionalString("getUrlDraft", m.getUrlDraft); }
+std::optional<std::string> TakeSubmittedUrl() { return CallOptionalString("takeSubmittedUrl", m.takeSubmittedUrl); }
 
 std::string GetUrl() { return CallString("getUrl", m.getUrl); }
 std::string GetTitle() { return CallString("getTitle", m.getTitle); }

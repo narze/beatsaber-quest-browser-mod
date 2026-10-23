@@ -51,6 +51,29 @@ DIR="/sdcard/Android/data/$PKG/files"
 adb pull "$DIR/frame1.png" "$OUT/frame1.png" >/dev/null
 adb pull "$DIR/frame2.png" "$OUT/frame2.png" >/dev/null
 
+echo "== Keyboard test"
+waitlog() {
+    for _ in $(seq 1 30); do
+        if adb logcat -d -s QBHarness:* | grep -q "$1"; then return 0; fi
+        sleep 0.5
+    done
+    return 1
+}
+adb logcat -c
+adb shell am force-stop "$PKG"
+adb shell am start -n "$PKG/.HarnessActivity" --es mode keyboard >/dev/null
+kb=0
+waitlog "READY_URL" || { echo "FAIL: URL keyboard not ready"; kb=1; }
+adb shell input text "example.org/page"
+waitlog "DRAFT example.org/page" || { echo "FAIL: URL draft not seen"; kb=1; }
+adb shell input keyevent 66
+waitlog "SUBMITTED example.org/page" || { echo "FAIL: URL not submitted"; kb=1; }
+waitlog "DRAFT_AFTER null" || { echo "FAIL: URL editing did not end"; kb=1; }
+waitlog "READY_PAGE" || { echo "FAIL: page field not ready"; kb=1; }
+adb shell input text "typed"
+waitlog "TITLE clicks=0 text=typed" || { echo "FAIL: text did not reach the page field"; kb=1; }
+adb logcat -d -s QBHarness:* QuestBrowser:* | grep -v "TITLE" | tee "$OUT/logcat-keyboard.txt"
+
 echo "== Check"
 fail=0
 grep -q "FAIL" "$OUT/logcat.txt" && { echo "FAIL: harness reported a failure"; fail=1; }
@@ -58,5 +81,6 @@ grep -q "TITLE clicks=1 text=hello quest y=[1-9]" "$OUT/logcat.txt" \
     || { echo "FAIL: expected title 'clicks=1 text=hello quest y=>0'"; fail=1; }
 [ -s "$OUT/frame1.png" ] && [ -s "$OUT/frame2.png" ] || { echo "FAIL: frames missing"; fail=1; }
 echo "Frames: $OUT/frame1.png $OUT/frame2.png"
+[ $kb -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "PASS"
 exit $fail

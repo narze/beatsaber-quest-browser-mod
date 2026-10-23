@@ -44,6 +44,11 @@ public class HarnessActivity extends Activity {
             return;
         }
 
+        if ("keyboard".equals(getIntent().getStringExtra("mode"))) {
+            runKeyboardTest();
+            return;
+        }
+
         // Centers of the elements in test.html, in page pixels.
         final float inputX = W / 2f, inputY = H * 0.10f;
         final float buttonX = W / 2f, buttonY = H * 0.40f;
@@ -61,6 +66,47 @@ public class HarnessActivity extends Activity {
             Log.i(TAG, "URL " + call("getUrl", new Class<?>[0]));
             Log.i(TAG, "DONE");
         });
+    }
+
+    /**
+     * Keyboard test. run.sh types with "adb shell input", which goes through the
+     * same Android input path as the Quest system keyboard.
+     * 1. URL bar: showUrlKeyboard, the script types a URL and presses Enter.
+     * 2. Page field: tap the input in test.html, the script types into it.
+     */
+    private void runKeyboardTest() {
+        at(3000, () -> {
+            call("showUrlKeyboard", new Class<?>[] {String.class}, "https://old.example/");
+            Log.i(TAG, "READY_URL");
+            pollUrl();
+        });
+    }
+
+    private String lastDraft;
+
+    private void pollUrl() {
+        String draft = (String) call("getUrlDraft", new Class<?>[0]);
+        if (draft != null && !draft.equals(lastDraft)) {
+            lastDraft = draft;
+            Log.i(TAG, "DRAFT " + draft);
+        }
+        String submitted = (String) call("takeSubmittedUrl", new Class<?>[0]);
+        if (submitted == null) {
+            at(200, this::pollUrl);
+            return;
+        }
+        Log.i(TAG, "SUBMITTED " + submitted);
+        Log.i(TAG, "DRAFT_AFTER " + call("getUrlDraft", new Class<?>[0]));
+        tap(W / 2f, H * 0.10f);
+        at(1000, () -> {
+            Log.i(TAG, "READY_PAGE");
+            pollTitle();
+        });
+    }
+
+    private void pollTitle() {
+        Log.i(TAG, "TITLE " + call("getTitle", new Class<?>[0]));
+        at(500, this::pollTitle);
     }
 
     private void tap(float x, float y) {

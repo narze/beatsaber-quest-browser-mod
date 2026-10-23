@@ -8,16 +8,22 @@ import android.graphics.Canvas;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 
 import org.json.JSONObject;
@@ -56,6 +62,13 @@ public final class BrowserBridge {
     private static Bitmap bitmap;
     private static Canvas canvas;
     private static long downTime;
+
+    // Hidden address field. The system keyboard types into it; the native side
+    // shows the draft and loads the URL that is submitted with Enter.
+    private static EditText urlField;
+    private static volatile boolean editingUrl;
+    private static volatile String urlDraft = "";
+    private static volatile String submittedUrl;
 
     private BrowserBridge() {}
 
@@ -141,6 +154,7 @@ public final class BrowserBridge {
         if (ctx instanceof Activity) {
             ((Activity) ctx).addContentView(container, new ViewGroup.LayoutParams(width, height));
         }
+        createUrlField(ctx);
         layout();
 
         bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
@@ -149,6 +163,59 @@ public final class BrowserBridge {
         webView.loadUrl(startUrl);
         Log.i(TAG, "WebView created " + width + "x" + height + " in " + ctx.getClass().getName());
         if (active) startRenderLoop();
+    }
+
+    private static void createUrlField(Context ctx) {
+        urlField = new EditText(ctx);
+        urlField.setSingleLine(true);
+        urlField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        urlField.setImeOptions(EditorInfo.IME_ACTION_GO | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        urlField.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                urlDraft = s.toString();
+            }
+        });
+        urlField.setOnEditorActionListener((v, actionId, event) -> {
+            if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
+                // Act on key down only, and consume the matching key up.
+                if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
+            } else if (actionId != EditorInfo.IME_ACTION_GO && actionId != EditorInfo.IME_ACTION_DONE) {
+                return false;
+            }
+            submittedUrl = v.getText().toString();
+            endUrlEditing();
+            return true;
+        });
+        urlField.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) editingUrl = false;
+        });
+        container.addView(urlField, new FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
+
+    private static void endUrlEditing() {
+        editingUrl = false;
+        hideImeNow();
+        webView.requestFocus();
+    }
+
+    private static InputMethodManager imm() {
+        return (InputMethodManager) webView.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+    }
+
+    private static void showImeFor(View view) {
+        boolean shown = imm().showSoftInput(view, 0);
+        Log.i(TAG, "showSoftInput(" + view.getClass().getSimpleName() + ") = " + shown);
+    }
+
+    private static void hideImeNow() {
+        imm().hideSoftInputFromWindow(container.getWindowToken(), 0);
     }
 
     private static Context resolveContext(Object host) {
@@ -182,6 +249,8 @@ public final class BrowserBridge {
                     webView.resumeTimers();
                     startRenderLoop();
                 } else {
+                    editingUrl = false;
+                    hideImeNow();
                     webView.onPause();
                     webView.pauseTimers();
                 }
@@ -336,6 +405,70 @@ public final class BrowserBridge {
                 e.setSource(InputDevice.SOURCE_TOUCHSCREEN);
                 webView.dispatchTouchEvent(e);
                 e.recycle();
+                if (action == MotionEvent.ACTION_UP) ui.postDelayed(BrowserBridge::showImeIfEditableFocused, 150);
+            }
+        });
+    }
+
+    private static final String IS_EDITABLE_JS = "(function(){var e=document.activeElement;"
+            + "return !!e&&(e.isContentEditable||/^(INPUT|TEXTAREA)$/.test(e.tagName));})()";
+
+    private static void showImeIfEditableFocused() {
+        if (webView == null) return;
+        webView.evaluateJavascript(IS_EDITABLE_JS, result -> {
+            if ("true".equals(result)) {
+                if (!webView.hasFocus()) webView.requestFocus();
+                showImeFor(webView);
+            }
+        });
+    }
+
+    // ---- Keyboard --------------------------------------------------------
+
+    /** Opens the system keyboard on the hidden address field, filled with url. */
+    public static void showUrlKeyboard(final String url) {
+        post(new Runnable() {
+            @Override
+            public void run() {
+                urlField.setText(url);
+                urlField.selectAll();
+                urlField.requestFocus();
+                editingUrl = true;
+                showImeFor(urlField);
+            }
+        });
+    }
+
+    /** The address being typed, or null when the address field is not in use. */
+    public static String getUrlDraft() {
+        return editingUrl ? urlDraft : null;
+    }
+
+    /** Returns the address submitted with Enter once, else null. */
+    public static String takeSubmittedUrl() {
+        String url = submittedUrl;
+        submittedUrl = null;
+        return url;
+    }
+
+    /** Opens the system keyboard for the focused element of the page. */
+    public static void showPageKeyboard() {
+        post(new Runnable() {
+            @Override
+            public void run() {
+                editingUrl = false;
+                webView.requestFocus();
+                showImeFor(webView);
+            }
+        });
+    }
+
+    public static void hideKeyboard() {
+        post(new Runnable() {
+            @Override
+            public void run() {
+                editingUrl = false;
+                hideImeNow();
             }
         });
     }

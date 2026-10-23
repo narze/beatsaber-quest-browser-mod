@@ -19,8 +19,6 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::Texture2D>, texture);
     DECLARE_INSTANCE_FIELD(UnityW<VRUIControls::VRPointer>, pointer);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::CanvasGroup>, canvasGroup);
-    // Bound to the value of the URL keyboard, so that it opens with the current URL.
-    DECLARE_INSTANCE_FIELD(StringW, urlValue);
 
     DECLARE_INSTANCE_METHOD(void, OnEnable);
     DECLARE_INSTANCE_METHOD(void, OnDisable);
@@ -32,8 +30,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_METHOD(void, OnHome);
     DECLARE_INSTANCE_METHOD(void, OnEnterKey);
     DECLARE_INSTANCE_METHOD(void, OnBackspace);
-    DECLARE_INSTANCE_METHOD(void, OnUrlEnter, StringW value);
-    DECLARE_INSTANCE_METHOD(void, OnTypeEnter, StringW value);
+    DECLARE_INSTANCE_METHOD(void, OnUrl);
+    DECLARE_INSTANCE_METHOD(void, OnKeyboard);
 
     DECLARE_DEFAULT_CTOR();
 

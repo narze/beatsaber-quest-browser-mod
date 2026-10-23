@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -23,8 +24,16 @@ void Reload();
 // action: 0 down, 1 up, 2 move, 3 cancel (Android MotionEvent values).
 void Touch(int action, float x, float y);
 void Scroll(float x, float y, float amount);
-void TypeText(std::string_view text);
 void PressKey(int androidKeyCode);
+
+// System keyboard (Android IME).
+void ShowUrlKeyboard(std::string_view currentUrl);
+void ShowPageKeyboard();
+void HideKeyboard();
+// The address being typed, or nullopt when the address field is not in use.
+std::optional<std::string> GetUrlDraft();
+// The address submitted with Enter, once.
+std::optional<std::string> TakeSubmittedUrl();
 
 std::string GetUrl();
 std::string GetTitle();

@@ -45,16 +45,14 @@ constexpr std::string_view kLayout = R"xml(
       <button text="&gt;" on-click="OnForward" pref-width="10" hover-hint="Forward"/>
       <button text="Reload" on-click="OnReload" pref-width="17"/>
       <button text="Home" on-click="OnHome" pref-width="15"/>
-      <button text="URL" click-event="show-url" pref-width="13" hover-hint="Type an address or a search"/>
-      <button text="Type" click-event="show-type" pref-width="15" hover-hint="Type text into the selected field"/>
+      <button text="URL" on-click="OnUrl" pref-width="13" hover-hint="Type an address or a search"/>
+      <button text="Keys" on-click="OnKeyboard" pref-width="15" hover-hint="Open the keyboard for the selected field"/>
       <button text="Enter" on-click="OnEnterKey" pref-width="16"/>
       <button text="Del" on-click="OnBackspace" pref-width="13" hover-hint="Backspace"/>
     </horizontal>
     <text id="titleText" text="Loading..." font-size="3.5" pref-height="5" align="Left"/>
     <raw-image id="pageImage" pref-width="144" pref-height="81"/>
   </vertical>
-  <modal-keyboard show-event="show-url" value="urlValue" on-enter="OnUrlEnter" clear-on-open="false" move-to-center="true" click-off-closes="true"/>
-  <modal-keyboard show-event="show-type" on-enter="OnTypeEnter" clear-on-open="true" move-to-center="true" click-off-closes="true"/>
 </bg>
 )xml";
 
@@ -78,6 +76,7 @@ void BrowserScreen::SetInteractive(bool value) {
         Jni::Touch(3, p.x, p.y);
     }
     if (!value) {
+        if (ready) Jni::HideKeyboard();
         tracker = {};
         triggerHeld = false;
     }
@@ -97,7 +96,6 @@ void BrowserScreen::Setup() {
         logger.error("BSML did not bind pageImage");
     }
 
-    urlValue = StringW(std::string(Logic::kHomeUrl));
     ready = Jni::Init(kPageWidth, kPageHeight, Logic::kHomeUrl);
     if (!ready) {
         if (titleText) titleText->text = "Browser failed to start. See the log for details.";
@@ -197,11 +195,22 @@ void BrowserScreen::UpdateInput() {
 void BrowserScreen::UpdateLabels() {
     labelTimer -= Time::get_deltaTime();
     if (labelTimer > 0.0f) return;
-    labelTimer = 0.25f;
+    labelTimer = 0.1f;
+
+    if (auto submitted = Jni::TakeSubmittedUrl()) {
+        auto url = Logic::NormalizeUrl(*submitted);
+        logger.info("Loading {}", url);
+        Jni::LoadUrl(url);
+    }
+    if (!titleText) return;
+
+    // While the address is typed, show it here: the system keyboard does not.
+    if (auto draft = Jni::GetUrlDraft()) {
+        titleText->text = fmt::format("URL: {}_", *draft);
+        return;
+    }
 
     auto url = Jni::GetUrl();
-    if (!url.empty()) urlValue = StringW(url);
-    if (!titleText) return;
 
     auto title = Jni::GetTitle();
     int progress = Jni::GetProgress();
@@ -218,16 +227,7 @@ void BrowserScreen::OnHome() { Jni::LoadUrl(Logic::kHomeUrl); }
 void BrowserScreen::OnEnterKey() { Jni::PressKey(kKeyEnter); }
 void BrowserScreen::OnBackspace() { Jni::PressKey(kKeyDelete); }
 
-void BrowserScreen::OnUrlEnter(StringW value) {
-    auto url = Logic::NormalizeUrl(static_cast<std::string>(value));
-    logger.info("Loading {}", url);
-    urlValue = StringW(url);
-    Jni::LoadUrl(url);
-}
-
-void BrowserScreen::OnTypeEnter(StringW value) {
-    auto text = static_cast<std::string>(value);
-    if (!text.empty()) Jni::TypeText(text);
-}
+void BrowserScreen::OnUrl() { Jni::ShowUrlKeyboard(Jni::GetUrl()); }
+void BrowserScreen::OnKeyboard() { Jni::ShowPageKeyboard(); }
 
 }  // namespace QuestBrowser
