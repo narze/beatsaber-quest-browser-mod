@@ -11,12 +11,17 @@
 
 // The browser keyboard, drawn in the game below the browser window.
 // Key presses go to the page, or to the address field while it is in use.
+//
+// It is on its own floating screen, not inside the window: the window screen has a
+// RectMask2D that clips everything outside its rectangle. It follows the window.
 DECLARE_CLASS_CODEGEN(QuestBrowser, KeyboardPanel, UnityEngine::MonoBehaviour) {
+    DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::Transform>, anchor);
+    DECLARE_INSTANCE_METHOD(void, LateUpdate);
     DECLARE_DEFAULT_CTOR();
 
    public:
-    // parent: the transform of the browser window. windowHeight: its height in UI units.
-    static KeyboardPanel* Create(UnityEngine::Transform* parent, float windowHeight);
+    // window: the transform of the browser window. windowHeight: its height in UI units.
+    static KeyboardPanel* Create(UnityEngine::Transform* window, float windowHeight);
 
     void SetVisible(bool visible);
     bool IsVisible();
@@ -28,10 +33,13 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, KeyboardPanel, UnityEngine::MonoBehaviour) {
         UnityW<TMPro::TextMeshProUGUI> text;
     };
 
-    void Build(float windowHeight);
+    void Build(UnityEngine::Vector2 size);
+    void FollowAnchor();
     void OnKey(Keys::KeyDef const& key);
     void RefreshLabels();
 
     Keys::KeyboardState state;
+    float windowHeight = 0.0f;
+    UnityEngine::Vector2 panelSize{};
     std::vector<KeyButton> buttons;
 };

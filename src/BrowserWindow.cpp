@@ -4,6 +4,7 @@
 #include "Config.hpp"
 #include "GlobalNamespace/MainMenuViewController.hpp"
 #include "GlobalNamespace/PauseController.hpp"
+#include "UnityEngine/Camera.hpp"
 #include "UnityEngine/GameObject.hpp"
 #include "UnityEngine/Transform.hpp"
 #include "beatsaber-hook/shared/utils/hooking.hpp"
@@ -60,6 +61,18 @@ void Apply() {
     EnsureCreated();
     if (placedFor != state.pose) {
         auto pose = Config::GetPose(state.pose);
+#ifdef QB_DEBUG_SHOW_KEYBOARD
+        // Debug builds: put the window 2.5 m in front of the headset, so a screenshot shows it.
+        if (auto cam = Camera::get_main()) {
+            auto t = cam->transform;
+            auto fwd = t->forward;
+            fwd.y = 0.0f;
+            auto dir = Vector3::Normalize(fwd);
+            auto p = t->position;
+            pose.position = Vector3(p.x + dir.x * 2.5f, p.y + 0.4f, p.z + dir.z * 2.5f);
+            pose.rotation = Quaternion::LookRotation(fwd, Vector3::get_up());
+        }
+#endif
         floatingScreen->transform->SetPositionAndRotation(pose.position, pose.rotation);
         placedFor = state.pose;
     }

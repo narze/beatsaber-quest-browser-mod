@@ -1,8 +1,11 @@
 #include "KeyboardPanel.hpp"
 
+#include <cmath>
+
 #include "JniBridge.hpp"
 #include "TMPro/FontStyles.hpp"
 #include "UnityEngine/Color.hpp"
+#include "bsml/shared/BSML/FloatingScreen/FloatingScreen.hpp"
 #include "UnityEngine/GameObject.hpp"
 #include "UnityEngine/Quaternion.hpp"
 #include "UnityEngine/RectOffset.hpp"
@@ -55,16 +58,7 @@ void SetSize(Component* c, float width, float height) {
 
 }  // namespace
 
-KeyboardPanel* KeyboardPanel::Create(Transform* parent, float windowHeight) {
-    auto go = GameObject::New_ctor("QuestBrowserKeyboard");
-    go->transform->SetParent(parent, false);
-    auto panel = go->AddComponent<KeyboardPanel*>();
-    panel->Build(windowHeight);
-    go->SetActive(false);
-    return panel;
-}
-
-void KeyboardPanel::Build(float windowHeight) {
+Vector2 PanelSize() {
     auto& rows = Keys::Layout();
     float width = 0.0f;
     for (auto const& row : rows) {
@@ -72,17 +66,43 @@ void KeyboardPanel::Build(float windowHeight) {
         for (auto const& key : row) w += key.width * kKeyUnit + kSpacing;
         width = std::max(width, w);
     }
-    width += 2 * kPadding;
-    float height = rows.size() * (kKeyHeight + kSpacing) + 2 * kPadding;
+    return {width + 2 * kPadding, rows.size() * (kKeyHeight + kSpacing) + 2 * kPadding};
+}
 
-    auto rect = gameObject->AddComponent<RectTransform*>();
-    if (!rect) rect = gameObject->GetComponent<RectTransform*>();
-    rect->anchorMin = {0.5f, 0.5f};
-    rect->anchorMax = {0.5f, 0.5f};
-    rect->pivot = {0.5f, 1.0f};
-    rect->sizeDelta = {width, height};
-    rect->anchoredPosition = {0.0f, -(windowHeight / 2.0f + kGap)};
-    rect->localRotation = Quaternion::Euler(kTiltDegrees, 0.0f, 0.0f);
+KeyboardPanel* KeyboardPanel::Create(Transform* window, float windowHeight) {
+    auto size = PanelSize();
+    auto screen = BSML::FloatingScreen::CreateFloatingScreen(size, false, window->position, window->rotation, 0.0f, false);
+    screen->name = "QuestBrowserKeyboard";
+    Object::DontDestroyOnLoad(screen->gameObject);
+
+    auto panel = screen->gameObject->AddComponent<KeyboardPanel*>();
+    panel->anchor = window;
+    panel->windowHeight = windowHeight;
+    panel->panelSize = size;
+    panel->Build(size);
+    panel->FollowAnchor();
+    screen->gameObject->SetActive(false);
+    return panel;
+}
+
+void KeyboardPanel::LateUpdate() { FollowAnchor(); }
+
+// Below the window, tilted toward the player, in the window's units and scale.
+void KeyboardPanel::FollowAnchor() {
+    if (!anchor) return;
+    float tilt = kTiltDegrees * 3.14159265f / 180.0f;
+    float top = -(windowHeight / 2.0f + kGap);
+    float half = panelSize.y / 2.0f;
+    // Rotating by +tilt around X moves the lower edge toward the player (-Z).
+    Vector3 centerInWindow{0.0f, top - half * std::cos(tilt), -half * std::sin(tilt)};
+    transform->position = anchor->TransformPoint(centerInWindow);
+    transform->rotation = Quaternion::op_Multiply(anchor->rotation, Quaternion::Euler(kTiltDegrees, 0.0f, 0.0f));
+    transform->localScale = anchor->lossyScale;
+}
+
+void KeyboardPanel::Build(Vector2 size) {
+    auto& rows = Keys::Layout();
+    float width = size.x;
 
     auto vertical = BSML::Lite::CreateVerticalLayoutGroup(transform);
     vertical->spacing = kSpacing;
@@ -123,7 +143,16 @@ void KeyboardPanel::Build(float windowHeight) {
     RefreshLabels();
 }
 
-void KeyboardPanel::SetVisible(bool visible) { gameObject->SetActive(visible); }
+void KeyboardPanel::SetVisible(bool visible) {
+    gameObject->SetActive(visible);
+    if (!visible) return;
+    auto rect = gameObject->GetComponent<RectTransform*>();
+    auto pos = transform->position;
+    auto scale = transform->lossyScale;
+    auto size = rect ? rect->rect.size : Vector2{};
+    logger.info("Keyboard shown: activeInHierarchy={} layer={} pos=({:.2f},{:.2f},{:.2f}) scale={:.4f} size=({:.1f},{:.1f}) keys={}",
+                gameObject->activeInHierarchy, gameObject->layer, pos.x, pos.y, pos.z, scale.x, size.x, size.y, buttons.size());
+}
 
 bool KeyboardPanel::IsVisible() { return gameObject->activeSelf; }
 

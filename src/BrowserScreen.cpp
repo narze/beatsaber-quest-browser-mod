@@ -112,6 +112,8 @@ void BrowserScreen::OnEnable() {
 }
 
 void BrowserScreen::OnDisable() {
+    // The keyboard is not a child of the window, so hide it with the window.
+    if (keyboard) keyboard->SetVisible(false);
     if (counted) {
         counted = false;
         if (auto change = activeScreens.Remove()) Jni::SetActive(*change);
@@ -234,6 +236,7 @@ void BrowserScreen::OnUrl() {
 }
 
 void BrowserScreen::OnKeyboard() {
+    logger.info("Keyboard button pressed (keyboard {})", keyboard ? (keyboard->IsVisible() ? "visible" : "hidden") : "missing");
     if (keyboard && keyboard->IsVisible()) HideKeyboard();
     else if (keyboard) keyboard->SetVisible(true);
 }
