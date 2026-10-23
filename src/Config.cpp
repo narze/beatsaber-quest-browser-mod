@@ -7,8 +7,20 @@ namespace QuestBrowser::Config {
 
 namespace {
 
-// To the left of the track, turned to face the player.
-constexpr InSongPose kDefaultPose{{-2.6f, 1.6f, 2.4f}, {0.0f, -0.4226f, 0.0f, 0.9063f}};  // yaw -50 degrees
+// Songs: to the left of the track, turned to face the player (yaw -50 degrees).
+constexpr Pose kDefaultSongPose{{-2.6f, 1.6f, 2.4f}, {0.0f, -0.4226f, 0.0f, 0.9063f}};
+// Menu: above the main menu screens, tilted down to the player (pitch -25 degrees).
+constexpr Pose kDefaultMenuPose{{0.0f, 3.4f, 3.6f}, {-0.2164f, 0.0f, 0.0f, 0.9763f}};
+
+// Song keys have no prefix, for compatibility with configs from 0.1.0.
+char const* Prefix(Logic::PoseSlot slot) { return slot == Logic::PoseSlot::Menu ? "menu" : ""; }
+Pose const& DefaultPose(Logic::PoseSlot slot) { return slot == Logic::PoseSlot::Menu ? kDefaultMenuPose : kDefaultSongPose; }
+
+std::string Key(Logic::PoseSlot slot, char const* name) {
+    std::string key = std::string(Prefix(slot)) + name;
+    if (slot == Logic::PoseSlot::Menu) key[4] = static_cast<char>(key[4] - 'a' + 'A');  // menuPosX
+    return key;
+}
 
 Configuration& Get() {
     static Configuration config({MOD_ID, VERSION, 0});
@@ -18,16 +30,33 @@ Configuration& Get() {
 rapidjson::Value& Doc() { return Get().config; }
 auto& Alloc() { return Get().config.GetAllocator(); }
 
-float GetFloat(char const* key, float fallback) {
+float GetFloat(std::string const& key, float fallback) {
     auto& doc = Doc();
-    if (doc.HasMember(key) && doc[key].IsNumber()) return doc[key].GetFloat();
+    auto it = doc.FindMember(key.c_str());
+    if (it != doc.MemberEnd() && it->value.IsNumber()) return it->value.GetFloat();
     return fallback;
 }
 
-void SetFloat(char const* key, float value) {
+void SetFloat(std::string const& key, float value) {
     auto& doc = Doc();
-    if (doc.HasMember(key)) doc[key].SetFloat(value);
+    auto it = doc.FindMember(key.c_str());
+    if (it != doc.MemberEnd()) it->value.SetFloat(value);
+    else doc.AddMember(rapidjson::Value(key.c_str(), Alloc()), rapidjson::Value(value), Alloc());
+}
+
+bool GetBool(char const* key, bool fallback) {
+    auto& doc = Doc();
+    auto it = doc.FindMember(key);
+    if (it != doc.MemberEnd() && it->value.IsBool()) return it->value.GetBool();
+    return fallback;
+}
+
+void SetBool(char const* key, bool value) {
+    auto& doc = Doc();
+    auto it = doc.FindMember(key);
+    if (it != doc.MemberEnd()) it->value.SetBool(value);
     else doc.AddMember(rapidjson::Value(key, Alloc()), rapidjson::Value(value), Alloc());
+    Get().Write();
 }
 
 }  // namespace
@@ -37,38 +66,36 @@ void Load() {
     if (!Doc().IsObject()) Doc().SetObject();
 }
 
-bool GetShowInSong() {
-    auto& doc = Doc();
-    if (doc.HasMember("showInSong") && doc["showInSong"].IsBool()) return doc["showInSong"].GetBool();
-    return true;
-}
+bool GetVisible() { return GetBool("visible", true); }
+void SetVisible(bool value) { SetBool("visible", value); }
 
-void SetShowInSong(bool value) {
-    auto& doc = Doc();
-    if (doc.HasMember("showInSong")) doc["showInSong"].SetBool(value);
-    else doc.AddMember("showInSong", value, Alloc());
-    Get().Write();
-}
+bool GetShowInSong() { return GetBool("showInSong", true); }
+void SetShowInSong(bool value) { SetBool("showInSong", value); }
 
-InSongPose GetInSongPose() {
-    auto const& d = kDefaultPose;
+Pose GetPose(Logic::PoseSlot slot) {
+    auto const& d = DefaultPose(slot);
+    auto f = [&](char const* name, float fallback) { return GetFloat(Key(slot, name), fallback); };
     return {
-        {GetFloat("posX", d.position.x), GetFloat("posY", d.position.y), GetFloat("posZ", d.position.z)},
-        {GetFloat("rotX", d.rotation.x), GetFloat("rotY", d.rotation.y), GetFloat("rotZ", d.rotation.z), GetFloat("rotW", d.rotation.w)},
+        {f("posX", d.position.x), f("posY", d.position.y), f("posZ", d.position.z)},
+        {f("rotX", d.rotation.x), f("rotY", d.rotation.y), f("rotZ", d.rotation.z), f("rotW", d.rotation.w)},
     };
 }
 
-void SetInSongPose(InSongPose const& pose) {
-    SetFloat("posX", pose.position.x);
-    SetFloat("posY", pose.position.y);
-    SetFloat("posZ", pose.position.z);
-    SetFloat("rotX", pose.rotation.x);
-    SetFloat("rotY", pose.rotation.y);
-    SetFloat("rotZ", pose.rotation.z);
-    SetFloat("rotW", pose.rotation.w);
+void SetPose(Logic::PoseSlot slot, Pose const& pose) {
+    auto f = [&](char const* name, float value) { SetFloat(Key(slot, name), value); };
+    f("posX", pose.position.x);
+    f("posY", pose.position.y);
+    f("posZ", pose.position.z);
+    f("rotX", pose.rotation.x);
+    f("rotY", pose.rotation.y);
+    f("rotZ", pose.rotation.z);
+    f("rotW", pose.rotation.w);
     Get().Write();
 }
 
-void ResetInSongPose() { SetInSongPose(kDefaultPose); }
+void ResetPoses() {
+    SetPose(Logic::PoseSlot::Menu, kDefaultMenuPose);
+    SetPose(Logic::PoseSlot::Song, kDefaultSongPose);
+}
 
 }  // namespace QuestBrowser::Config

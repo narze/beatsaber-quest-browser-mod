@@ -1,0 +1,128 @@
+#include "BrowserWindow.hpp"
+
+#include "BrowserScreen.hpp"
+#include "Config.hpp"
+#include "GlobalNamespace/MainMenuViewController.hpp"
+#include "GlobalNamespace/PauseController.hpp"
+#include "UnityEngine/GameObject.hpp"
+#include "UnityEngine/Transform.hpp"
+#include "beatsaber-hook/shared/utils/hooking.hpp"
+#include "bsml/shared/BSML/FloatingScreen/FloatingScreen.hpp"
+#include "main.hpp"
+
+DEFINE_TYPE(QuestBrowser, SongScope);
+
+using namespace GlobalNamespace;
+using namespace UnityEngine;
+
+namespace QuestBrowser::Window {
+
+namespace {
+
+// Fits the layout in BrowserScreen.cpp: 144 x 81 page, toolbar, title, padding.
+// Scaled to about 1.8 m x 1.3 m.
+constexpr Vector2 kScreenSize{150.0f, 106.0f};
+constexpr float kScale = 0.012f;
+
+Logic::Context context = Logic::Context::Menu;
+std::optional<Logic::PoseSlot> placedFor;
+SafePtrUnity<BSML::FloatingScreen> floatingScreen;
+SafePtrUnity<BrowserScreen> browserScreen;
+
+void OnHandleReleased(BSML::FloatingScreen*, BSML::FloatingScreenHandleEventArgs const& args) {
+    if (!placedFor) return;
+    Config::SetPose(*placedFor, {args.position, args.rotation});
+    logger.info("Saved browser position for {}", *placedFor == Logic::PoseSlot::Menu ? "menu" : "songs");
+}
+
+void EnsureCreated() {
+    if (floatingScreen) return;
+    auto screen = BSML::FloatingScreen::CreateFloatingScreen(kScreenSize, true, {}, Quaternion::get_identity(), 0.0f, true);
+    screen->name = "QuestBrowserWindow";
+    screen->transform->localScale = Vector3(kScale, kScale, kScale);
+    // Keep the window, and so the page, when the game changes scenes.
+    Object::DontDestroyOnLoad(screen->gameObject);
+    screen->HandleReleased.addCallback(&OnHandleReleased);
+    screen->set_HandleSide(BSML::Side::Bottom);
+
+    floatingScreen = screen;
+    placedFor.reset();
+    browserScreen = BrowserScreen::CreateIn(screen->transform);
+    logger.info("Created browser window");
+}
+
+void Apply() {
+    auto state = Logic::ScreenStateFor(context, Config::GetVisible(), Config::GetShowInSong());
+    if (!state.visible) {
+        if (floatingScreen) floatingScreen->gameObject->SetActive(false);
+        return;
+    }
+    EnsureCreated();
+    if (placedFor != state.pose) {
+        auto pose = Config::GetPose(state.pose);
+        floatingScreen->transform->SetPositionAndRotation(pose.position, pose.rotation);
+        placedFor = state.pose;
+    }
+    floatingScreen->gameObject->SetActive(true);
+    floatingScreen->set_ShowHandle(state.showHandle);
+    if (browserScreen) browserScreen->SetInteractive(state.interactive);
+}
+
+void SetContext(Logic::Context value) {
+    context = value;
+    Apply();
+}
+
+}  // namespace
+
+void ToggleVisible() {
+    Config::SetVisible(!Config::GetVisible());
+    Apply();
+}
+
+void Refresh() { Apply(); }
+
+void OnSongEnded() { SetContext(Logic::Context::Menu); }
+
+void ResetPositions() {
+    Config::ResetPoses();
+    placedFor.reset();
+    Apply();
+}
+
+MAKE_HOOK_MATCH(MainMenuViewController_DidActivate, &MainMenuViewController::DidActivate, void, MainMenuViewController* self,
+                bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling) {
+    MainMenuViewController_DidActivate(self, firstActivation, addedToHierarchy, screenSystemEnabling);
+    SetContext(Logic::Context::Menu);
+}
+
+MAKE_HOOK_MATCH(PauseController_Start, &PauseController::Start, void, PauseController* self) {
+    PauseController_Start(self);
+    self->gameObject->AddComponent<SongScope*>();
+    // A level can start paused (for example after the game lost focus).
+    bool paused = self->_paused == PauseController::PauseState::Paused;
+    SetContext(paused ? Logic::Context::SongPaused : Logic::Context::SongPlaying);
+}
+
+MAKE_HOOK_MATCH(PauseController_Pause, &PauseController::Pause, void, PauseController* self) {
+    PauseController_Pause(self);
+    if (self->_paused == PauseController::PauseState::Paused) SetContext(Logic::Context::SongPaused);
+}
+
+MAKE_HOOK_MATCH(PauseController_HandlePauseMenuManagerDidPressContinueButton,
+                &PauseController::HandlePauseMenuManagerDidPressContinueButton, void, PauseController* self) {
+    // Lock the window before the resume countdown, so a click can not reach the page during play.
+    SetContext(Logic::Context::SongPlaying);
+    PauseController_HandlePauseMenuManagerDidPressContinueButton(self);
+}
+
+void InstallHooks() {
+    INSTALL_HOOK(logger, MainMenuViewController_DidActivate);
+    INSTALL_HOOK(logger, PauseController_Start);
+    INSTALL_HOOK(logger, PauseController_Pause);
+    INSTALL_HOOK(logger, PauseController_HandlePauseMenuManagerDidPressContinueButton);
+}
+
+}  // namespace QuestBrowser::Window
+
+void QuestBrowser::SongScope::OnDestroy() { Window::OnSongEnded(); }

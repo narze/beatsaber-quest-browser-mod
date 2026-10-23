@@ -39,7 +39,7 @@ Logic::ActiveCounter activeScreens;
 
 constexpr std::string_view kLayout = R"xml(
 <bg>
-  <vertical spacing="1" child-expand-height="false" child-control-height="true" anchor-pos-y="2">
+  <vertical spacing="1" pad="3" child-align="UpperCenter" child-expand-height="false" child-control-height="true">
     <horizontal spacing="1" pref-height="8" child-expand-width="false">
       <button text="&lt;" on-click="OnBack" pref-width="10" hover-hint="Back"/>
       <button text="&gt;" on-click="OnForward" pref-width="10" hover-hint="Forward"/>

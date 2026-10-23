@@ -116,3 +116,39 @@ TEST_CASE("FrameRateFor lowers the rate while a song is playing") {
     CHECK(FrameRateFor(true) == 30);
     CHECK(FrameRateFor(false) == 15);
 }
+
+TEST_CASE("ScreenStateFor: menu is interactive with a handle") {
+    auto s = ScreenStateFor(Context::Menu, true, true);
+    CHECK(s.visible);
+    CHECK(s.interactive);
+    CHECK(s.showHandle);
+    CHECK(s.pose == PoseSlot::Menu);
+}
+
+TEST_CASE("ScreenStateFor: playing a song shows the page but locks it") {
+    auto s = ScreenStateFor(Context::SongPlaying, true, true);
+    CHECK(s.visible);
+    CHECK_FALSE(s.interactive);
+    CHECK_FALSE(s.showHandle);
+    CHECK(s.pose == PoseSlot::Song);
+}
+
+TEST_CASE("ScreenStateFor: pause unlocks the song screen") {
+    auto s = ScreenStateFor(Context::SongPaused, true, true);
+    CHECK(s.visible);
+    CHECK(s.interactive);
+    CHECK(s.showHandle);
+    CHECK(s.pose == PoseSlot::Song);
+}
+
+TEST_CASE("ScreenStateFor: hidden by the user means hidden everywhere") {
+    CHECK_FALSE(ScreenStateFor(Context::Menu, false, true).visible);
+    CHECK_FALSE(ScreenStateFor(Context::SongPlaying, false, true).visible);
+    CHECK_FALSE(ScreenStateFor(Context::SongPaused, false, true).visible);
+}
+
+TEST_CASE("ScreenStateFor: 'show during songs' off hides it only in songs") {
+    CHECK(ScreenStateFor(Context::Menu, true, false).visible);
+    CHECK_FALSE(ScreenStateFor(Context::SongPlaying, true, false).visible);
+    CHECK_FALSE(ScreenStateFor(Context::SongPaused, true, false).visible);
+}

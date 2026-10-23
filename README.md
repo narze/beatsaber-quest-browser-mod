@@ -7,15 +7,20 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 ## Use
 
 1. Install `QuestBrowser.qmod` with [ModsBeforeFriday](https://mbf.bsquest.xyz/) or QuestPatcher. It installs BSML, custom-types, and beatsaber-hook too if they are missing.
-2. In the main menu, select **Browser** in the mods list on the left.
+2. The browser is one floating window. It stays open in the menu and in songs, and the page does not reload between them.
+   - **Browser** in the mods list on the left of the main menu shows or hides it.
+   - Menu: click the page, and drag the handle below the window to move it.
+   - Song: the page shows, but you can not click it. Pause to click it or to move it.
+   - The menu and songs each keep their own window position.
 3. Controls:
    - Point at the page and pull the trigger to click. Hold the trigger and move to drag.
    - Move the thumbstick up or down to scroll the page under the pointer.
-   - **URL** opens a keyboard. Type an address (`example.com`) or a search (`beat saber mods`).
-   - **Type** opens a keyboard that types into the selected field of the page. **Enter** and **Del** send these keys.
-   - **<**, **>**, **Reload**, **Home** work like in a desktop browser.
+   - **URL** opens the system keyboard for the address. The title line shows what you type. Enter loads it. Type an address (`example.com`) or a search (`beat saber mods`).
+   - Tap a text field on the page, or press **Keys**, to type into the page.
+   - **<**, **>**, **Reload**, **Home**, **Enter**, **Del** work like in a desktop browser.
+4. Mod settings > **Browser**: show the window during songs or not, and reset the positions.
 
-The page stops (timers, video, audio) when you close the browser screen.
+The page stops (timers, video, audio) while the window is hidden. In songs it updates at 15 fps to keep the game smooth.
 
 ## How it works
 
@@ -69,8 +74,8 @@ tests/android-harness/run.sh
 
 - Video plays in software draw mode, so it can be slow or black. Text pages and most web apps work.
 - The page is 1280 x 720 at 30 fps. Increase the size for sharper text, or decrease it for better frame rate.
-- Pages can not open the Android system keyboard. Use the **Type** button.
-- Main menu only. The browser is not available during a song.
+- The Quest system keyboard does not show over Beat Saber yet: Beat Saber does not declare `oculus.software.overlay_keyboard`. A physical keyboard paired with the Quest should still type.
+- Solo songs only. The window does not show in multiplayer.
 
 ## Credits
 

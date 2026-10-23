@@ -158,4 +158,23 @@ class ActiveCounter {
 // Page frame rate. It is lower while a song plays, to keep the game smooth.
 inline int FrameRateFor(bool interactive) { return interactive ? 30 : 15; }
 
+enum class Context { Menu, SongPlaying, SongPaused };
+enum class PoseSlot { Menu, Song };
+
+struct ScreenState {
+    bool visible;
+    bool interactive;
+    bool showHandle;
+    PoseSlot pose;
+};
+
+// How the one browser window looks in each part of the game.
+// userVisible: the menu button toggle. showInSong: the mod setting.
+inline ScreenState ScreenStateFor(Context context, bool userVisible, bool showInSong) {
+    bool inSong = context != Context::Menu;
+    bool visible = userVisible && (!inSong || showInSong);
+    bool interactive = context != Context::SongPlaying;
+    return {visible, interactive, interactive, inSong ? PoseSlot::Song : PoseSlot::Menu};
+}
+
 }  // namespace QuestBrowser::Logic

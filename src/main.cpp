@@ -2,9 +2,8 @@
 #include "main.hpp"
 
 // Include dependency headers
-#include "BrowserScreen.hpp"
 #include "Config.hpp"
-#include "InSongBrowser.hpp"
+#include "BrowserWindow.hpp"
 #include "UnityEngine/Transform.hpp"
 #include "bsml/shared/BSML-Lite.hpp"
 #include "bsml/shared/BSML.hpp"
@@ -33,24 +32,28 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
     BSML::Init();
 
     // Adds a "Browser" button to the mods list on the left of the main menu.
-    BSML::Register::RegisterMainMenuViewControllerMethod(
-        "Browser", "Browser", "Open a web browser", [](HMUI::ViewController* viewController, bool firstActivation, bool, bool) {
-            if (firstActivation) QuestBrowser::BrowserScreen::CreateIn(viewController->transform);
-        });
+    // It shows or hides the browser window, which stays open in songs too.
+    BSML::Register::RegisterMenuButton("Browser", "Show or hide the web browser", QuestBrowser::Window::ToggleVisible);
 
-    // Mod settings: show the browser during songs, and reset its position.
+    // Mod settings: show the browser during songs, and reset its positions.
     BSML::Register::RegisterSettingsMenu(
         "Browser", [](HMUI::ViewController* viewController, bool firstActivation, bool, bool) {
             if (!firstActivation) return;
             auto container = BSML::Lite::CreateScrollableSettingsContainer(viewController->transform);
             BSML::Lite::CreateToggle(container->transform, "Show browser during songs", QuestBrowser::Config::GetShowInSong(),
-                                     [](bool value) { QuestBrowser::Config::SetShowInSong(value); });
-            BSML::Lite::CreateText(container->transform, "Pause the song to click the page or to move it with the handle below it.", 3.5f);
-            BSML::Lite::CreateUIButton(container->transform, "Reset in-song position", []() { QuestBrowser::Config::ResetInSongPose(); });
+                                     [](bool value) {
+                                         QuestBrowser::Config::SetShowInSong(value);
+                                         QuestBrowser::Window::Refresh();
+                                     });
+            BSML::Lite::CreateText(container->transform,
+                                   "Move the window with the handle below it. The menu and songs each keep their own position. "
+                                   "In a song, pause to click or move it.",
+                                   3.5f);
+            BSML::Lite::CreateUIButton(container->transform, "Reset positions", QuestBrowser::Window::ResetPositions);
         },
         false);
 
-    QuestBrowser::InSong::InstallHooks();
+    QuestBrowser::Window::InstallHooks();
 
     logger.info("Completed load!");
 }
