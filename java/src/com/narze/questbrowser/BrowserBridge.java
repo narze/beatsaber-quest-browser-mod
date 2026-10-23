@@ -115,9 +115,24 @@ public final class BrowserBridge {
         });
     }
 
+    /** Lets the WebView load plain http:// pages, which Beat Saber's network policy blocks. */
+    private static void allowCleartextHttp() {
+        try {
+            libcore.net.NetworkSecurityPolicy current = libcore.net.NetworkSecurityPolicy.getInstance();
+            if (!(current instanceof PermissiveNetworkPolicy)) {
+                libcore.net.NetworkSecurityPolicy.setInstance(new PermissiveNetworkPolicy(current));
+            }
+            Log.i(TAG, "Plain HTTP allowed: "
+                    + android.security.NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted("example.com"));
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not allow plain HTTP; http:// pages will not load", t);
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private static void create(Object host, String startUrl) {
         if (webView != null) return;
+        allowCleartextHttp();
         Context ctx = resolveContext(host);
         if (ctx == null) {
             Log.e(TAG, "No Context found, can not create WebView");

@@ -17,20 +17,30 @@ PKG=com.narze.questbrowser.harness
 rm -rf "$OUT" && mkdir -p "$OUT"/{bridge,harness,assets,apk}
 
 echo "== Build bridge dex"
-javac --release 11 -Xlint:-options -classpath "$ANDROID_JAR" -d "$OUT/bridge" \
+mkdir -p "$OUT/stubs"
+javac --release 11 -Xlint:-options -classpath "$ANDROID_JAR" -d "$OUT/stubs" $(find "$ROOT/java/stubs" -name '*.java')
+javac --release 11 -Xlint:-options -classpath "$ANDROID_JAR:$OUT/stubs" -d "$OUT/bridge" \
     $(find "$ROOT/java/src" -name '*.java')
 jar cf "$OUT/bridge.jar" -C "$OUT/bridge" .
 "$BT/d8" --release --min-api 29 --lib "$ANDROID_JAR" --output "$OUT/bridge" "$OUT/bridge.jar"
 cp "$OUT/bridge/classes.dex" "$OUT/assets/questbrowser.dex"
 cp "$HERE/assets/"* "$OUT/assets/"
 
+echo "== Build harness native library (hidden API exemption, as in the mod)"
+NDK="$(cat "$ROOT/ndkpath.txt")"
+mkdir -p "$OUT/apk/lib/arm64-v8a"
+"$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++" --target=aarch64-linux-android29 -std=c++20 -O2 \
+    -shared -fPIC -static-libstdc++ -I "$ROOT/include" \
+    "$ROOT/src/hidden_api.cpp" "$HERE/jni/harness_jni.cpp" -o "$OUT/apk/lib/arm64-v8a/libqbharness.so"
+
 echo "== Build harness APK"
 javac --release 11 -Xlint:-options -classpath "$ANDROID_JAR" -d "$OUT/harness" \
     $(find "$HERE/src" -name '*.java')
 jar cf "$OUT/harness.jar" -C "$OUT/harness" .
 "$BT/d8" --release --min-api 29 --lib "$ANDROID_JAR" --output "$OUT/apk" "$OUT/harness.jar"
-"$BT/aapt2" link -o "$OUT/base.apk" -I "$ANDROID_JAR" --manifest "$HERE/AndroidManifest.xml" -A "$OUT/assets"
-(cd "$OUT/apk" && zip -q "$OUT/base.apk" classes.dex)
+"$BT/aapt2" compile --dir "$HERE/res" -o "$OUT/res.zip"
+"$BT/aapt2" link -o "$OUT/base.apk" -I "$ANDROID_JAR" --manifest "$HERE/AndroidManifest.xml" -A "$OUT/assets" "$OUT/res.zip"
+(cd "$OUT/apk" && zip -q "$OUT/base.apk" classes.dex lib/arm64-v8a/libqbharness.so)
 "$BT/zipalign" -f 4 "$OUT/base.apk" "$OUT/aligned.apk"
 "$BT/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-pass pass:android \
     --out "$OUT/harness.apk" "$OUT/aligned.apk"
@@ -99,6 +109,19 @@ awk -v a="${after:-0}" -v b="${before:-0}" 'BEGIN { exit !(a >= 20 && a >= b * 0
 fmag=$(grep -o "FS_MAGENTA [0-9.]*" "$OUT/logcat-fullscreen.txt" | awk '{print $2}')
 awk -v f="${fmag:-0}" 'BEGIN { exit !(f >= 0.5) }' || { echo "FAIL: video not drawn in fullscreen (magenta ${fmag:-none})"; fs=1; }
 
+echo "== Plain HTTP test"
+python3 -m http.server 8765 --bind 127.0.0.1 --directory "$HERE/http" >/dev/null 2>&1 &
+HTTP_PID=$!
+trap 'kill $HTTP_PID 2>/dev/null' EXIT
+sleep 1
+adb logcat -c
+adb shell am force-stop "$PKG"
+adb shell am start -n "$PKG/.HarnessActivity" --es mode http >/dev/null
+http=0
+waitlog "HTTP_DONE" || true
+adb logcat -d -s QBHarness:* QuestBrowser:* | tee "$OUT/logcat-http.txt" | grep -E "HTTP_|leartext"
+grep -q "HTTP_TITLE http ok" "$OUT/logcat-http.txt" || { echo "FAIL: plain HTTP page did not load"; http=1; }
+
 echo "== Check"
 fail=0
 grep -q "FAIL" "$OUT/logcat.txt" && { echo "FAIL: harness reported a failure"; fail=1; }
@@ -109,5 +132,6 @@ echo "Frames: $OUT/frame1.png $OUT/frame2.png"
 [ $kb -eq 0 ] || fail=1
 [ $vid -eq 0 ] || fail=1
 [ $fs -eq 0 ] || fail=1
+[ $http -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "PASS"
 exit $fail

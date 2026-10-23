@@ -72,6 +72,10 @@ End-to-end test of the Java bridge on an Android emulator or device. It builds a
 tests/android-harness/run.sh
 ```
 
+## Plain HTTP
+
+Beat Saber's network security config blocks plain `http://`. The mod allows it again for the game process, so local servers such as `http://truenas.local:8096` load. It swaps Android's process-wide `NetworkSecurityPolicy` for one that permits cleartext; that class is an Android internal API, so `src/hidden_api.cpp` exempts only this class from the hidden API policy first.
+
 ## Known limits
 
 - Video plays at the page frame rate (60 fps in the menu, 30 fps in songs). Protected video (DRM) may stay black.

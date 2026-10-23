@@ -25,19 +25,24 @@ find_package(Java 11 REQUIRED COMPONENTS Development)
 message(STATUS "Dex: android.jar=${ANDROID_JAR} d8=${D8}")
 
 file(GLOB_RECURSE JAVA_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/java/src/*.java")
+# Compile-only stubs of Android internal classes; they are not in the dex.
+file(GLOB_RECURSE JAVA_STUBS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/java/stubs/*.java")
 set(DEX_DIR "${CMAKE_CURRENT_BINARY_DIR}/dex")
 set(DEX_FILE "${DEX_DIR}/questbrowser.dex")
 
 add_custom_command(
     OUTPUT "${DEX_FILE}"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${DEX_DIR}/classes" "${DEX_DIR}/classes.dex"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${DEX_DIR}/classes"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${DEX_DIR}/stubs"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${DEX_DIR}/classes" "${DEX_DIR}/stubs"
+    COMMAND ${Java_JAVAC_EXECUTABLE} --release 11 -Xlint:-options
+            -classpath "${ANDROID_JAR}" -d "${DEX_DIR}/stubs" ${JAVA_STUBS}
     COMMAND ${Java_JAVAC_EXECUTABLE} --release 11 -Xlint:all -Xlint:-options -Werror
-            -classpath "${ANDROID_JAR}" -d "${DEX_DIR}/classes" ${JAVA_SOURCES}
+            -classpath "${ANDROID_JAR}:${DEX_DIR}/stubs" -d "${DEX_DIR}/classes" ${JAVA_SOURCES}
     COMMAND ${Java_JAR_EXECUTABLE} cf "${DEX_DIR}/classes.jar" -C "${DEX_DIR}/classes" .
     COMMAND ${D8} --release --min-api 29 --lib "${ANDROID_JAR}" --output "${DEX_DIR}" "${DEX_DIR}/classes.jar"
     COMMAND ${CMAKE_COMMAND} -E rename "${DEX_DIR}/classes.dex" "${DEX_FILE}"
-    DEPENDS ${JAVA_SOURCES}
+    DEPENDS ${JAVA_SOURCES} ${JAVA_STUBS}
     COMMENT "Building questbrowser.dex"
     VERBATIM
 )

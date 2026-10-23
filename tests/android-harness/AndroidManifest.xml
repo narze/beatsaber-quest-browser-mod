@@ -3,7 +3,10 @@
     package="com.narze.questbrowser.harness">
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="32" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:label="QB Harness" android:hardwareAccelerated="true">
+    <!-- Same network policy as Beat Saber: plain HTTP is blocked. -->
+    <application android:label="QB Harness" android:hardwareAccelerated="true"
+        android:networkSecurityConfig="@xml/network_sec_config"
+        android:extractNativeLibs="true">
         <!-- Same as Beat Saber's UnityPlayerActivity: no hardware acceleration for the window. -->
         <activity android:name=".HarnessActivity" android:exported="true" android:hardwareAccelerated="false">
             <intent-filter>

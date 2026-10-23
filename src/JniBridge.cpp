@@ -2,6 +2,7 @@
 
 #include <jni.h>
 
+#include "hidden_api.hpp"
 #include "main.hpp"
 #include "scotland2/shared/modloader.h"
 
@@ -203,6 +204,11 @@ bool Init(int width, int height, std::string_view startUrl) {
         logger.error("No JNIEnv, modloader_jvm is {}", fmt::ptr(modloader_jvm));
         return false;
     }
+
+    // Beat Saber's network policy blocks plain http://. BrowserBridge swaps the policy,
+    // which is an Android internal class; exempt it from the hidden API policy first.
+    bool exempted = HiddenApi::Exempt(modloader_jvm, {"Llibcore/net/NetworkSecurityPolicy;"});
+    logger.info("Hidden API exemption for the network policy: {}", exempted ? "ok" : "failed");
 
     jobject activity = FindActivity(env);
     logger.info("Unity activity: {}", activity ? "found" : "not found, using Application context");

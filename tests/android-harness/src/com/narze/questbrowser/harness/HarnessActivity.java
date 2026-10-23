@@ -32,6 +32,8 @@ public class HarnessActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        // Same hidden API exemption as the mod does before it starts the browser.
+        System.loadLibrary("qbharness");
         try {
             byte[] dex = readAsset("questbrowser.dex");
             ClassLoader loader = new InMemoryDexClassLoader(ByteBuffer.wrap(dex), getClassLoader());
@@ -46,6 +48,15 @@ public class HarnessActivity extends Activity {
 
         if ("keyboard".equals(getIntent().getStringExtra("mode"))) {
             runKeyboardTest();
+            return;
+        }
+        if ("http".equals(getIntent().getStringExtra("mode"))) {
+            // run.sh serves tests/android-harness/http on the host; 10.0.2.2 is the host from the emulator.
+            call("loadUrl", new Class<?>[] {String.class}, "http://10.0.2.2:8765/index.html");
+            whenTitle("http ok", () -> {
+                Log.i(TAG, "HTTP_TITLE " + call("getTitle", new Class<?>[0]));
+                Log.i(TAG, "HTTP_DONE");
+            }, 50);
             return;
         }
         if ("fullscreen".equals(getIntent().getStringExtra("mode"))) {
