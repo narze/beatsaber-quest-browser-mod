@@ -1,0 +1,15 @@
+{
+  "_QPVersion": "0.1.1",
+  "name": "${mod_name}",
+  "id": "${mod_id}",
+  "version": "${version}",
+  "author": "narze",
+  "packageId": "com.beatgames.beatsaber",
+  "packageVersion": "1.45.3_30054",
+  "description": "An in-game web browser for Beat Saber on Quest.",
+  "dependencies": [],
+  "modFiles": [],
+  "lateModFiles": [],
+  "libraryFiles": [],
+  "fileCopies": []
+}
