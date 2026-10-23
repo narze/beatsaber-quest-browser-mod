@@ -30,7 +30,7 @@ The page stops (timers, video, audio) while the window is hidden. It updates at 
  ┌──────────────────────────────┐   JNI    ┌───────────────────────────────┐
  │ BrowserScreen (MonoBehaviour)│ ───────▶ │ BrowserBridge (Java, our dex) │
  │  - RawImage + Texture2D      │          │  - off-screen WebView          │
- │  - VRPointer hit → touch     │ ◀─────── │  - draws to Bitmap at 30 fps   │
+ │  - VRPointer hit → touch     │ ◀─────── │  - GPU draw at 60 fps (30 song)│
  │  - thumbstick → wheel scroll │  frames  │  - double-buffered ByteBuffer  │
  └──────────────────────────────┘          └───────────────────────────────┘
 ```
