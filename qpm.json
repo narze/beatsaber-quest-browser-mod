@@ -34,7 +34,7 @@
         "python ./extern/includes/mod-scripts/shared/restart.py $0:?"
       ]
     },
-    "ndk": "^29.0.14206865",
+    "ndk": "^27.3.13750724",
     "qmodIncludeDirs": [
       "./build",
       "./extern/libs",
@@ -51,39 +51,34 @@
     },
     {
       "id": "scotland2",
-      "versionRange": "^0.1.7",
+      "versionRange": "^0.1.6",
       "additionalData": {
         "includeQmod": false
       }
     },
     {
       "id": "paper2_scotland2",
-      "versionRange": "^4.8.0",
-      "additionalData": {}
-    },
-    {
-      "id": "flamingo",
-      "versionRange": "^1.2.1",
+      "versionRange": ">=4.7.0, <4.8.0",
       "additionalData": {}
     },
     {
       "id": "beatsaber-hook",
-      "versionRange": "^9.3.0",
+      "versionRange": "^6.4.2",
       "additionalData": {}
     },
     {
       "id": "bs-cordl",
-      "versionRange": "^4503.0.0",
+      "versionRange": "^4008.0.0",
       "additionalData": {}
     },
     {
       "id": "bsml",
-      "versionRange": "^0.6.5",
+      "versionRange": "^0.4.55",
       "additionalData": {}
     },
     {
       "id": "custom-types",
-      "versionRange": "^0.21.2",
+      "versionRange": "^0.18.4",
       "additionalData": {}
     }
   ]

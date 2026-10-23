@@ -10,9 +10,17 @@ namespace QuestBrowser::Jni {
 namespace {
 
 // The Java helper, compiled to dex by CMake (see cmake/dex.cmake).
-constexpr unsigned char kDex[] = {
-#embed "questbrowser.dex"
-};
+// QB_DEX_PATH is the absolute path of the dex file, set by CMake.
+// .incbin works on every NDK clang; #embed needs clang 19+.
+__asm__(
+    ".pushsection .rodata\n"
+    ".balign 16\n"
+    "qb_dex_begin:\n"
+    ".incbin \"" QB_DEX_PATH "\"\n"
+    "qb_dex_end:\n"
+    ".popsection\n");
+extern "C" unsigned char const qb_dex_begin[] __asm__("qb_dex_begin");
+extern "C" unsigned char const qb_dex_end[] __asm__("qb_dex_end");
 
 constexpr char const* kBridgeClass = "com.narze.questbrowser.BrowserBridge";
 
@@ -105,7 +113,7 @@ jclass LoadBridgeClass(JNIEnv* env, jobject activity) {
     }
 
     // The dex bytes live in our .so for the life of the process, so a direct buffer is safe.
-    jobject buffer = env->NewDirectByteBuffer(const_cast<unsigned char*>(kDex), sizeof(kDex));
+    jobject buffer = env->NewDirectByteBuffer(const_cast<unsigned char*>(qb_dex_begin), qb_dex_end - qb_dex_begin);
     jclass dexLoaderCls = env->FindClass("dalvik/system/InMemoryDexClassLoader");
     if (CheckException(env, "FindClass InMemoryDexClassLoader")) return nullptr;
     jmethodID ctor = env->GetMethodID(dexLoaderCls, "<init>", "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V");
@@ -204,7 +212,7 @@ bool Init(int width, int height, std::string_view startUrl) {
     if (CheckException(env, "BrowserBridge.init")) return false;
 
     ready = true;
-    logger.info("Browser bridge ready ({}x{}, dex {} bytes)", width, height, sizeof(kDex));
+    logger.info("Browser bridge ready ({}x{}, dex {} bytes)", width, height, static_cast<long>(qb_dex_end - qb_dex_begin));
     return true;
 }
 

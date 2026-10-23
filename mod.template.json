@@ -5,7 +5,7 @@
   "version": "${version}",
   "author": "narze",
   "packageId": "com.beatgames.beatsaber",
-  "packageVersion": "1.45.3_30054",
+  "packageVersion": "1.40.8_7379",
   "description": "An in-game web browser for Beat Saber on Quest.",
   "dependencies": [],
   "modFiles": [],

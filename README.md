@@ -2,7 +2,7 @@
 
 An in-game web browser for Beat Saber on Quest (Quest 3 / 3S / 2 / Pro).
 
-Target: Beat Saber **1.45.3_30054**, Scotland2 mod loader.
+Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 
 ## Use
 
@@ -29,7 +29,7 @@ The page stops (timers, video, audio) when you close the browser screen.
  └──────────────────────────────┘          └───────────────────────────────┘
 ```
 
-- `java/src/.../BrowserBridge.java` is compiled to a dex at build time (`cmake/dex.cmake`) and embedded in the `.so` with `#embed`. At runtime, `src/JniBridge.cpp` loads it with `InMemoryDexClassLoader`, so the mod is a single file.
+- `java/src/.../BrowserBridge.java` is compiled to a dex at build time (`cmake/dex.cmake`) and embedded in the `.so` with an assembler `.incbin`. At runtime, `src/JniBridge.cpp` loads it with `InMemoryDexClassLoader`, so the mod is a single file.
 - `src/BrowserScreen.cpp` builds the BSML UI, copies new frames into a `Texture2D`, and converts laser pointer hits (`VRPointer.cursorPosition`) into page pixels.
 - `include/browser_logic.hpp` holds the game-independent logic (URL parsing, coordinate mapping, touch state). It has host unit tests.
 

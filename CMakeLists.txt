@@ -61,8 +61,7 @@ add_dependencies(${COMPILE_ID} questbrowser_dex)
 # Listing the dex as a source puts its custom command in this target, so it is built first
 target_sources(${COMPILE_ID} PRIVATE ${DEX_FILE})
 set_source_files_properties(${DEX_FILE} PROPERTIES HEADER_FILE_ONLY TRUE GENERATED TRUE)
-target_compile_options(${COMPILE_ID} PRIVATE "--embed-dir=${DEX_DIR}")
-target_compile_options(${COMPILE_ID} PRIVATE -Wno-c23-extensions)
+target_compile_definitions(${COMPILE_ID} PRIVATE QB_DEX_PATH="${DEX_FILE}")
 set_source_files_properties(${SOURCE_DIR}/JniBridge.cpp PROPERTIES OBJECT_DEPENDS ${DEX_FILE})
 
 add_custom_command(
