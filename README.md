@@ -84,7 +84,7 @@ tests/android-harness/run.sh
 
 ## Plain HTTP
 
-Beat Saber's network security config blocks plain `http://`. The mod allows it again for the game process, so local servers such as `http://truenas.local:8096` load. It swaps Android's process-wide `NetworkSecurityPolicy` for one that permits cleartext; that class is an Android internal API, so `src/hidden_api.cpp` exempts only this class from the hidden API policy first.
+Beat Saber's network security config blocks plain `http://`. The mod allows it again for the game process, so local servers such as `http://nas.local:8096` load. It swaps Android's process-wide `NetworkSecurityPolicy` for one that permits cleartext; that class is an Android internal API, so `src/hidden_api.cpp` exempts only this class from the hidden API policy first.
 
 ## Known limits
 
@@ -99,3 +99,7 @@ Beat Saber's network security config blocks plain `http://`. The mod allows it a
 * [Metalit](https://github.com/Metalit), [Sc2ad](https://github.com/Sc2ad), [zoller27osu](https://github.com/zoller27osu), [jakibaki](https://github.com/jakibaki) for: [beatsaber-hook](https://github.com/QuestPackageManager/beatsaber-hook)
 * [Fern](https://github.com/Fernthedev) for: [QPM](https://github.com/QuestPackageManager/QPM.CLI), [bs-cordl](https://github.com/QuestPackageManager/bs-cordl), [paperlog](https://github.com/Fernthedev/paperlog)
 * [RedBrumbler](https://github.com/RedBrumbler) and bsq-ports for: [Quest-BSML](https://github.com/bsq-ports/Quest-BSML)
+
+## License
+
+MIT. See [LICENSE](LICENSE).

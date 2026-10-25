@@ -5,7 +5,7 @@ package com.narze.questbrowser;
  *
  * Beat Saber's network security config blocks plain HTTP, and WebView asks this
  * process-wide policy for each http:// request. Without this, local servers such
- * as http://truenas.local:8096 do not load.
+ * as http://nas.local:8096 do not load.
  */
 final class PermissiveNetworkPolicy extends libcore.net.NetworkSecurityPolicy {
     private final libcore.net.NetworkSecurityPolicy base;
