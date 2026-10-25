@@ -72,6 +72,9 @@ void SetVisible(bool value) { SetBool("visible", value); }
 bool GetShowInSong() { return GetBool("showInSong", true); }
 void SetShowInSong(bool value) { SetBool("showInSong", value); }
 
+bool GetShortcutEnabled() { return GetBool("shortcut", true); }
+void SetShortcutEnabled(bool value) { SetBool("shortcut", value); }
+
 Pose GetPose(Logic::PoseSlot slot) {
     auto const& d = DefaultPose(slot);
     auto f = [&](char const* name, float fallback) { return GetFloat(Key(slot, name), fallback); };

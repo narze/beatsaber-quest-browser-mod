@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UnityEngine/MonoBehaviour.hpp"
+#include "browser_logic.hpp"
 #include "custom-types/shared/macros.hpp"
 
 // One floating browser window that lives for the whole session, in the menu and in songs.
@@ -15,6 +16,8 @@ void Refresh();
 // Settings: move the window back to the default positions.
 void ResetPositions();
 void BringHere();
+// Menu, song playing, or song paused.
+Logic::Context CurrentContext();
 void FitControls();
 float GetControlScale();
 float GetChromeHeight();

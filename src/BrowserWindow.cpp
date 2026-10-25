@@ -3,6 +3,7 @@
 #include "BrowserScreen.hpp"
 #include "Config.hpp"
 #include "ResizeGrip.hpp"
+#include "ShortcutListener.hpp"
 #include "GlobalNamespace/MainMenuViewController.hpp"
 #include "GlobalNamespace/PauseController.hpp"
 #include "UnityEngine/Camera.hpp"
@@ -115,6 +116,8 @@ void ToggleVisible() {
 
 void Refresh() { Apply(); }
 
+Logic::Context CurrentContext() { return context; }
+
 float GetControlScale() { return browserScreen ? browserScreen->GetControlScale() : 1.0f; }
 float GetChromeHeight() { return browserScreen ? browserScreen->GetChromeHeight() : Resize::kChromeHeight; }
 void FitControls() {
@@ -167,6 +170,7 @@ void ResetPositions() {
 MAKE_HOOK_MATCH(MainMenuViewController_DidActivate, &MainMenuViewController::DidActivate, void, MainMenuViewController* self,
                 bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling) {
     MainMenuViewController_DidActivate(self, firstActivation, addedToHierarchy, screenSystemEnabling);
+    ShortcutListener::EnsureCreated();
     SetContext(Logic::Context::Menu);
 }
 

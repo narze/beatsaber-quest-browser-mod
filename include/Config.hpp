@@ -27,6 +27,10 @@ void SetVisible(bool value);
 bool GetShowInSong();
 void SetShowInSong(bool value);
 
+// Hold the left thumbstick click to bring the browser in front of you.
+bool GetShortcutEnabled();
+void SetShortcutEnabled(bool value);
+
 // One saved position and size for the menu and one for songs.
 Pose GetPose(Logic::PoseSlot slot);
 void SetPose(Logic::PoseSlot slot, Pose const& pose);

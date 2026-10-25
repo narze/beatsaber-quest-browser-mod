@@ -53,6 +53,9 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
                                    3.5f);
             BSML::Lite::CreateUIButton(container->transform, "Reset positions and sizes", QuestBrowser::Window::ResetPositions);
             BSML::Lite::CreateUIButton(container->transform, "Bring browser here", QuestBrowser::Window::BringHere);
+            BSML::Lite::CreateToggle(container->transform, "Hold left thumbstick click: bring browser here",
+                                     QuestBrowser::Config::GetShortcutEnabled(),
+                                     [](bool value) { QuestBrowser::Config::SetShortcutEnabled(value); });
         },
         false);
 
