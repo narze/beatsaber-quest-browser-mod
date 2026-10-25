@@ -15,22 +15,21 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - Song: the page shows, but you can not click it. Pause to click, move, or resize it.
    - The menu and songs each keep their own window position and size.
 3. Controls:
+   - The window shows only the page. Point at it and a slim toolbar fades in below it: **back**, **forward**, **reload**, the page title (click it to type an address or a search), **tabs** (with the number of tabs), and **menu**.
+   - **Tabs** lists your tabs: open one, close one with **x**, or **+ New tab** (opens the keyboard). Up to 10 tabs; background tabs are paused. Tabs come back at the next start, and each loads when you open it.
+   - **Menu**: Home, History, Keyboard, Zoom, Opacity, and the window shape.
+   - Tap a text field on the page to open the keyboard. Fullscreen video fills the window; back or **Esc** leaves fullscreen.
    - Back, Forward, URL, and **Menu** stay visible. **Menu > Browse** contains Reload, Home, Keyboard, and History. **Menu > View** contains aspect, zoom, and opacity controls (**Fade - / +**). Close Menu to give the page more room.
    - Buttons and labels grow with distance. The minimum window size fits the controls; there is no maximum window width or height.
    - Point at the page and pull the trigger to click. Hold the trigger and move to drag.
    - Move the thumbstick up or down to scroll the page under the pointer.
-   - **URL** opens the keyboard to type an address. The title line shows what you type. Enter loads it. Type an address (`example.com`) or a search (`beat saber mods`).
-   - Tap a text field on the page to open the keyboard, or press **Keyboard**. **Hide** closes it.
    - Clicking outside both the browser window and keyboard also closes the keyboard.
    - **History** opens up to 100 recent URLs, newest first. Click a URL to revisit it, **Delete** to remove one, or **Clear all** to erase the list. **Newer** and **Older** switch pages. History stays saved across restarts; recording starts with this version.
    - **Opacity - / +** adjusts the window from 20% to 100% in 10% steps. The setting stays saved across restarts.
    - **Aspect** cycles Free, 16:9, 4:3, and Portrait (9:16). Presets constrain the page area, excluding the toolbar; select Free to unlock the ratio again. Width, height, and preset save separately for menus and songs.
    - **Zoom - / +** adjusts page zoom from 50% to 200%, without changing the window. Pages reflow to the new viewport. The keyboard follows the resized window. Minimum dimensions keep the toolbar and history usable.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
-   - **<**, **>**, **Reload**, **Home** work like in a desktop browser.
-   - **Tabs:** the row under the toolbar shows up to 4 tabs; the open tab is blue. **+** opens a new tab and the keyboard, **x** closes the open tab (the last tab goes back to the home page). Up to 10 tabs; with more than 4, the row scrolls with the open tab, and `<` / `>` mark tabs past the edges. Background tabs are paused (a video there stops).
    - Tabs come back at the next start. Only the open tab loads; the others load when you open them.
-   - Fullscreen video fills the browser window. **<** or **Esc** leaves fullscreen.
 4. Browser settings: show the browser, show it during songs, the reset keybind (Off, X + Y, A + B, X + A, Y + B, left, right, or both stick clicks), and **Reset menu position** / **Reset in-song position**. A reset puts that window back at its default size, centered and raised above the song selection.
 
 The page stops (timers, video, audio) while the window is hidden. While a song plays, only the page shows; pause to see the controls. The move handle is above the window. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
