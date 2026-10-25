@@ -22,6 +22,12 @@ inline float ControlScale(float distance, float worldScale) {
     return std::max(1.0f, distance * 0.012f / (2.5f * std::max(worldScale, 0.0001f)));
 }
 
+// Window height while a song plays: the controls are hidden, so only the page and
+// its padding remain. The page keeps the size it has with the controls shown.
+inline float PlayModeHeight(Dimensions size, float chrome) {
+    return std::max(81.0f, size.height - chrome) + kPaddingWidth;
+}
+
 inline Dimensions DimensionsFromDrag(Dimensions start, float dx, float dy, int axisX, int axisY, float aspect,
                                      float controls = 1, float chrome = kChromeHeight) {
     float minWidth = kPaddingWidth + 144 * controls;
@@ -46,9 +52,13 @@ inline Vec3 Sub(Vec3 a, Vec3 b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
 inline float Dot(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 inline float Length(Vec3 a) { return std::sqrt(Dot(a, a)); }
 
+// The window moves this many times as far as the hand, so a short arm movement
+// covers the 0.6 m to 8 m range.
+constexpr float kDepthGain = 4.0f;
+
 // Controller motion sideways/upwards does not affect depth. Axis must be normalized.
-inline float DepthFromDrag(float startDistance, Vec3 controllerDelta, Vec3 axis) {
-    return std::clamp(startDistance + Dot(controllerDelta, axis), 0.6f, 8.0f);
+inline float DepthFromDrag(float startDistance, Vec3 controllerDelta, Vec3 axis, float gain = 1.0f) {
+    return std::clamp(startDistance + gain * Dot(controllerDelta, axis), 0.6f, 8.0f);
 }
 
 // Where the ray (origin, direction) meets the plane (point, normal).

@@ -32,9 +32,22 @@ SafePtrUnity<BSML::FloatingScreen> floatingScreen;
 SafePtrUnity<BrowserScreen> browserScreen;
 std::vector<SafePtrUnity<ResizeGrip>> resizeGrips;
 
+// The move handle sits above the window: at the bottom it sank into the floor
+// and could not be reached. BSML puts a top handle across the top edge, where it
+// would cover the toolbar, so raise it just above the edge.
+void PlaceHandle() {
+    if (!floatingScreen) return;
+    auto handle = floatingScreen->handle;
+    if (!handle || !handle->m_CachedPtr.m_value) return;
+    auto size = floatingScreen->get_ScreenSize();
+    float thickness = size.y / 15.0f;
+    handle->transform->localPosition = Vector3(0.0f, size.y / 2.0f + thickness / 2.0f + 1.0f, 0.0f);
+}
+
 void ApplyDimensions(Resize::Dimensions size, bool save) {
     if (!floatingScreen) return;
     floatingScreen->set_ScreenSize({size.width, size.height});
+    PlaceHandle();
     if (browserScreen) browserScreen->SetDimensions(size);
     if (save && placedFor) Config::SetDimensions(*placedFor, size);
 }
@@ -54,7 +67,7 @@ void EnsureCreated() {
     // Keep the window, and so the page, when the game changes scenes.
     Object::DontDestroyOnLoad(screen->gameObject);
     screen->HandleReleased.addCallback(&OnHandleReleased);
-    screen->set_HandleSide(BSML::Side::Bottom);
+    screen->set_HandleSide(BSML::Side::Top);
 
     floatingScreen = screen;
     placedFor.reset();
@@ -98,8 +111,20 @@ void Apply() {
     }
     floatingScreen->gameObject->SetActive(true);
     floatingScreen->set_ShowHandle(state.showHandle);
+    PlaceHandle();
     for (auto& grip : resizeGrips) if (grip) grip->gameObject->SetActive(state.showHandle);
-    if (browserScreen) browserScreen->SetInteractive(state.interactive);
+    if (browserScreen) {
+        bool wasCompact = browserScreen->IsChromeHidden();
+        // While a song plays only the page shows; the controls come back on pause.
+        browserScreen->SetChromeHidden(!state.interactive);
+        browserScreen->SetInteractive(state.interactive);
+        if (wasCompact && state.interactive && placedFor) {
+            ApplyDimensions(Config::GetDimensions(*placedFor), false);
+            FitControls();
+        } else if (!state.interactive) {
+            FitControls();
+        }
+    }
 }
 
 void SetContext(Logic::Context value) {
@@ -122,6 +147,13 @@ float GetControlScale() { return browserScreen ? browserScreen->GetControlScale(
 float GetChromeHeight() { return browserScreen ? browserScreen->GetChromeHeight() : Resize::kChromeHeight; }
 void FitControls() {
     if (!floatingScreen || !browserScreen) return;
+    if (browserScreen->IsChromeHidden()) {
+        // Play mode: just the page and its padding; the page keeps its size.
+        auto size = browserScreen->GetDimensions();
+        floatingScreen->set_ScreenSize({size.width, Resize::PlayModeHeight(size, GetChromeHeight())});
+        PlaceHandle();
+        return;
+    }
     auto rect = floatingScreen->GetComponent<RectTransform*>()->rect;
     ApplyDimensions(Resize::DimensionsFromDrag({rect.width, rect.height}, 0, 0, 0, 0,
                     Resize::AspectFor(GetAspectPreset()), GetControlScale(), GetChromeHeight()), false);

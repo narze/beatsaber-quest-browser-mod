@@ -235,11 +235,21 @@ float BrowserScreen::GetChromeHeight() const {
     return 12.0f + rows * (10.0f * controlScale + 1.0f);
 }
 
+void BrowserScreen::SetChromeHidden(bool hidden) {
+    if (hidden == chromeHidden) return;
+    chromeHidden = hidden;
+    if (hidden && historyPanel && historyPanel->activeSelf) OnHistory();
+    RefreshControls();
+}
+
 void BrowserScreen::RefreshControls() {
-    if (groupControls) groupControls->gameObject->SetActive(menuOpen);
-    if (browseControls) browseControls->gameObject->SetActive(menuOpen && !viewOpen);
-    if (viewControls) viewControls->gameObject->SetActive(menuOpen && viewOpen);
-    if (viewStatus) viewStatus->gameObject->SetActive(menuOpen && viewOpen);
+    bool show = !chromeHidden;
+    if (mainControls) mainControls->gameObject->SetActive(show);
+    if (titleText) titleText->gameObject->SetActive(show);
+    if (groupControls) groupControls->gameObject->SetActive(show && menuOpen);
+    if (browseControls) browseControls->gameObject->SetActive(show && menuOpen && !viewOpen);
+    if (viewControls) viewControls->gameObject->SetActive(show && menuOpen && viewOpen);
+    if (viewStatus) viewStatus->gameObject->SetActive(show && menuOpen && viewOpen);
     for (auto& size : controlSizes) {
         size.layout->preferredWidth = size.width * controlScale;
         size.layout->minWidth = size.width * controlScale;

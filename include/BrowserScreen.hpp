@@ -65,6 +65,10 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     float GetControlScale() const { return controlScale; }
     float GetChromeHeight() const;
     void RefreshForPose() { UpdateControlScale(); }
+    // Play mode: hide the toolbar rows and the title, so only the page shows.
+    void SetChromeHidden(bool hidden);
+    bool IsChromeHidden() const { return chromeHidden; }
+    QuestBrowser::Resize::Dimensions GetDimensions() const { return dimensions; }
 
    private:
     void Setup();
@@ -87,6 +91,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     std::vector<UnityW<TMPro::TextMeshProUGUI>> controlLabels;
     float controlScale = 1;
     bool menuOpen = false;
+    bool chromeHidden = false;
     bool viewOpen = false;
     Resize::Dimensions dimensions;
     bool viewportDirty = true;

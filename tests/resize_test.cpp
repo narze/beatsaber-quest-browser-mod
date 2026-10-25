@@ -105,3 +105,18 @@ TEST_CASE("TriggerLatch has hysteresis and reports the press and release edges")
     CHECK(t.Update(0.2f) == Edge::Released);
     CHECK_FALSE(t.IsHeld());
 }
+
+TEST_CASE("DepthFromDrag: the gain makes the window move faster than the hand") {
+    // Hand 0.25 m forward with gain 4: the window moves 1 m.
+    CHECK(DepthFromDrag(3, {0, 0, 0.25f}, {0, 0, 1}, kDepthGain) == doctest::Approx(3 + 0.25f * kDepthGain));
+    CHECK(kDepthGain >= 3.0f);
+    // Limits still apply.
+    CHECK(DepthFromDrag(3, {0, 0, 5}, {0, 0, 1}, kDepthGain) == doctest::Approx(8));
+}
+
+TEST_CASE("PlayModeHeight: only the page and its padding, the page keeps its size") {
+    // 126 tall window with 45 of controls: page 81, plus 6 of padding.
+    CHECK(PlayModeHeight({150, 126}, 45) == doctest::Approx(87));
+    // A taller window keeps its taller page.
+    CHECK(PlayModeHeight({150, 300}, 45) == doctest::Approx(261));
+}

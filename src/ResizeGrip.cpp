@@ -139,7 +139,7 @@ void ResizeGrip::Update() {
     }
     if (depthMode) {
         auto delta = Vector3::op_Subtraction(controller->position, startController);
-        float distance = Resize::DepthFromDrag(startDepth, ToVec(delta), ToVec(depthAxis));
+        float distance = Resize::DepthFromDrag(startDepth, ToVec(delta), ToVec(depthAxis), Resize::kDepthGain);
         window->position = Vector3(depthOrigin.x + depthAxis.x * distance,
                                    depthOrigin.y + depthAxis.y * distance,
                                    depthOrigin.z + depthAxis.z * distance);
