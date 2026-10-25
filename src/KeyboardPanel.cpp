@@ -91,7 +91,7 @@ void KeyboardPanel::LateUpdate() { FollowAnchor(); }
 void KeyboardPanel::FollowAnchor() {
     if (!anchor) return;
     float tilt = kTiltDegrees * 3.14159265f / 180.0f;
-    float top = -(windowHeight / 2.0f + kGap);
+    float top = -(windowHeight / 2.0f + kGap + extraOffset);
     float half = panelSize.y / 2.0f;
     // Rotating by +tilt around X moves the lower edge toward the player (-Z).
     Vector3 centerInWindow{0.0f, top - half * std::cos(tilt), -half * std::sin(tilt)};

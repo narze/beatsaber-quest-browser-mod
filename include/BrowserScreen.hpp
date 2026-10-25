@@ -6,60 +6,31 @@
 #include "UnityEngine/MonoBehaviour.hpp"
 #include "UnityEngine/Transform.hpp"
 #include "UnityEngine/Texture2D.hpp"
+#include "UnityEngine/UI/Button.hpp"
 #include "UnityEngine/UI/RawImage.hpp"
-#include "UnityEngine/UI/HorizontalLayoutGroup.hpp"
 #include "UnityEngine/UI/LayoutElement.hpp"
 #include "VRUIControls/VRPointer.hpp"
 #include "KeyboardPanel.hpp"
-#include "UnityEngine/UI/Button.hpp"
+#include "ToolbarPanel.hpp"
 #include "browser_logic.hpp"
-#include "tabs_logic.hpp"
 #include "resize_logic.hpp"
+#include "tabs_logic.hpp"
 #include "custom-types/shared/macros.hpp"
 
-// Shows the web page on a RawImage and turns laser pointer input into touches.
-// It is also the BSML host for the layout in BrowserScreen.cpp.
+// The browser window: only the page, with panels (tabs, menu, history) that take
+// the place of the page when open. The toolbar floats below (ToolbarPanel).
+// Shows the page on a RawImage and turns laser pointer input into touches.
 DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::RawImage>, pageImage);
-    DECLARE_INSTANCE_FIELD(UnityW<TMPro::TextMeshProUGUI>, titleText);
-    DECLARE_INSTANCE_FIELD(UnityW<TMPro::TextMeshProUGUI>, opacityText);
-    DECLARE_INSTANCE_FIELD(UnityW<TMPro::TextMeshProUGUI>, shapeText);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::Texture2D>, texture);
     DECLARE_INSTANCE_FIELD(UnityW<VRUIControls::VRPointer>, pointer);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::CanvasGroup>, canvasGroup);
     DECLARE_INSTANCE_FIELD(UnityW<KeyboardPanel>, keyboard);
-    DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, mainControls);
-    DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, tabControls);
-    DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, groupControls);
-    DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, browseControls);
-    DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, viewControls);
-    DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, viewStatus);
+    DECLARE_INSTANCE_FIELD(UnityW<ToolbarPanel>, toolbar);
 
     DECLARE_INSTANCE_METHOD(void, OnEnable);
     DECLARE_INSTANCE_METHOD(void, OnDisable);
     DECLARE_INSTANCE_METHOD(void, Update);
-
-    DECLARE_INSTANCE_METHOD(void, OnBack);
-    DECLARE_INSTANCE_METHOD(void, OnForward);
-    DECLARE_INSTANCE_METHOD(void, OnReload);
-    DECLARE_INSTANCE_METHOD(void, OnHome);
-    DECLARE_INSTANCE_METHOD(void, OnUrl);
-    DECLARE_INSTANCE_METHOD(void, OnKeyboard);
-    DECLARE_INSTANCE_METHOD(void, OnHistory);
-    DECLARE_INSTANCE_METHOD(void, OnOpacityDown);
-    DECLARE_INSTANCE_METHOD(void, OnOpacityUp);
-    DECLARE_INSTANCE_METHOD(void, OnAspect);
-    DECLARE_INSTANCE_METHOD(void, OnZoomDown);
-    DECLARE_INSTANCE_METHOD(void, OnZoomUp);
-    DECLARE_INSTANCE_METHOD(void, OnMenu);
-    DECLARE_INSTANCE_METHOD(void, OnTab0);
-    DECLARE_INSTANCE_METHOD(void, OnTab1);
-    DECLARE_INSTANCE_METHOD(void, OnTab2);
-    DECLARE_INSTANCE_METHOD(void, OnTab3);
-    DECLARE_INSTANCE_METHOD(void, OnNewTab);
-    DECLARE_INSTANCE_METHOD(void, OnCloseTab);
-    DECLARE_INSTANCE_METHOD(void, OnBrowseGroup);
-    DECLARE_INSTANCE_METHOD(void, OnViewGroup);
 
     DECLARE_DEFAULT_CTOR();
 
@@ -71,42 +42,55 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     // Used while a song plays.
     void SetInteractive(bool value);
     void SetDimensions(QuestBrowser::Resize::Dimensions size);
-    float GetControlScale() const { return controlScale; }
-    float GetChromeHeight() const;
-    void RefreshForPose() { UpdateControlScale(); }
-    // Play mode: hide the toolbar rows and the title, so only the page shows.
+    // The window has no controls inside, so the minimum size does not grow with distance.
+    float GetControlScale() const { return 1.0f; }
+    float GetChromeHeight() const { return Resize::kChromeHeight; }
+    void RefreshForPose() {}
+    // Play mode: hide the toolbar and close panels, so only the page shows.
     void SetChromeHidden(bool hidden);
     bool IsChromeHidden() const { return chromeHidden; }
     QuestBrowser::Resize::Dimensions GetDimensions() const { return dimensions; }
 
    private:
+    enum class Panel { None, Tabs, Menu, History };
+
     void Setup();
+    ToolbarActions MakeToolbarActions();
     void UpdateTexture();
     void UpdateInput();
     void UpdateLabels();
+    std::string ToolbarLabel();
     void HideKeyboard();
-    void BuildHistory();
-    void RefreshHistory();
+    void OpenUrlEditing();
+    void ToggleKeyboard();
+    void ApplyViewport();
     void ChangeOpacity(float delta);
     void ChangeZoom(float delta);
-    void ApplyViewport();
-    void UpdateControlScale();
-    void RefreshControls();
-    struct ControlSize {
-        UnityW<UnityEngine::UI::LayoutElement> layout;
-        float width;
-    };
-    std::vector<ControlSize> controlSizes;
-    std::vector<UnityW<TMPro::TextMeshProUGUI>> controlLabels;
-    float controlScale = 1;
-    bool menuOpen = false;
+
+    // Panels in the page area.
+    UnityEngine::GameObject* MakePanel();
+    void ShowPanel(Panel panel);
+    void BuildMenu();
+    void RefreshMenu();
+    void BuildHistory();
+    void RefreshHistory();
+    void BuildTabs();
+    void RefreshTabs();
+    Panel openPanel = Panel::None;
+    std::vector<UnityW<UnityEngine::GameObject>> panels;  // indexed by Panel - 1
+    std::vector<UnityW<UnityEngine::UI::LayoutElement>> panelSizes;
+
     bool chromeHidden = false;
-    bool viewOpen = false;
     Resize::Dimensions dimensions;
     bool viewportDirty = true;
     float viewportTimer = 0;
 
-    UnityW<UnityEngine::GameObject> historyPanel;
+    // Menu panel.
+    UnityW<TMPro::TextMeshProUGUI> zoomText;
+    UnityW<TMPro::TextMeshProUGUI> opacityText;
+    UnityW<TMPro::TextMeshProUGUI> aspectText;
+
+    // History panel.
     std::vector<std::string> history;
     std::vector<UnityW<TMPro::TextMeshProUGUI>> historyLabels;
     std::vector<UnityW<UnityEngine::UI::Button>> historyOpenButtons;
@@ -115,18 +99,19 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     std::size_t historyPage = 0;
     std::string lastHistoryUrl;
 
-    // Tab strip: the first kStripSlots children of tabControls are tab buttons.
+    // Tabs panel, and the tab list read from the Java side.
     void UpdateTabs();
-    void RefreshTabStrip();
-    void OnTabSlot(int slot);
     int tabsVersion = -1;
     std::vector<std::string> tabUrls;
     std::vector<std::string> tabTitles;
     int activeTab = 0;
-    Tabs::Range stripRange{0, 0};
-    std::vector<UnityW<UnityEngine::UI::Button>> tabButtons;
+    std::size_t tabsPage = 0;
     std::vector<UnityW<TMPro::TextMeshProUGUI>> tabLabels;
+    std::vector<UnityW<UnityEngine::UI::Button>> tabOpenButtons;
+    std::vector<UnityW<UnityEngine::UI::Button>> tabCloseButtons;
+    UnityW<TMPro::TextMeshProUGUI> tabsStatus;
     UnityW<UnityEngine::UI::Button> newTabButton;
+    void CloseTab(int index);
 
     bool ready = false;
     bool interactive = true;

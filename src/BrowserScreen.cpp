@@ -1,12 +1,16 @@
 #include "BrowserScreen.hpp"
 
+#include <chrono>
+
+#include "BrowserWindow.hpp"
+#include "Config.hpp"
 #include "GlobalNamespace/VRController.hpp"
 #include "JniBridge.hpp"
-#include "Config.hpp"
-#include "BrowserWindow.hpp"
-#include "bsml/shared/BSML-Lite.hpp"
-#include "UnityEngine/UI/LayoutElement.hpp"
 #include "System/IntPtr.hpp"
+#include "TMPro/FontStyles.hpp"
+#include "TMPro/TextAlignmentOptions.hpp"
+#include "TMPro/TextOverflowModes.hpp"
+#include "UnityEngine/Color.hpp"
 #include "UnityEngine/FilterMode.hpp"
 #include "UnityEngine/GameObject.hpp"
 #include "UnityEngine/Rect.hpp"
@@ -14,13 +18,12 @@
 #include "UnityEngine/TextureFormat.hpp"
 #include "UnityEngine/TextureWrapMode.hpp"
 #include "UnityEngine/Time.hpp"
-#include "UnityEngine/Camera.hpp"
-
-#include <chrono>
 #include "UnityEngine/Transform.hpp"
+#include "UnityEngine/UI/HorizontalLayoutGroup.hpp"
+#include "UnityEngine/UI/VerticalLayoutGroup.hpp"
+#include "bsml/shared/BSML-Lite.hpp"
 #include "bsml/shared/BSML.hpp"
 #include "main.hpp"
-#include "TMPro/FontStyles.hpp"
 
 DEFINE_TYPE(QuestBrowser, BrowserScreen);
 
@@ -38,52 +41,66 @@ constexpr float kTriggerPress = 0.75f;
 constexpr float kTriggerRelease = 0.35f;
 constexpr float kScrollSpeed = 0.25f;
 
+// Rows per page in the tabs and history panels.
+constexpr std::size_t kRows = 5;
+
+Color const kAccent{0.25f, 0.85f, 1.0f, 1.0f};
+Color const kWhite{1.0f, 1.0f, 1.0f, 1.0f};
+
 // Shared by every BrowserScreen: the page runs while any screen is visible.
 Logic::ActiveCounter activeScreens;
 
+// Only the page. Panels are added next to it in code; the toolbar floats below.
 constexpr std::string_view kLayout = R"xml(
 <bg>
-  <vertical spacing="1" pad="3" child-align="UpperCenter" child-expand-height="false" child-control-height="true">
-    <horizontal id="mainControls" spacing="1" pref-height="10" child-expand-width="false">
-      <button text="&lt;" on-click="OnBack" pref-width="22" hover-hint="Back"/>
-      <button text="&gt;" on-click="OnForward" pref-width="22" hover-hint="Forward"/>
-      <button text="URL" on-click="OnUrl" pref-width="40" hover-hint="Type an address or a search"/>
-      <button text="Menu" on-click="OnMenu" pref-width="40"/>
-    </horizontal>
-    <horizontal id="tabControls" spacing="1" pref-height="10" child-expand-width="false">
-      <button text="" on-click="OnTab0" pref-width="28"/>
-      <button text="" on-click="OnTab1" pref-width="28"/>
-      <button text="" on-click="OnTab2" pref-width="28"/>
-      <button text="" on-click="OnTab3" pref-width="28"/>
-      <button text="+" on-click="OnNewTab" pref-width="14" hover-hint="New tab"/>
-      <button text="x" on-click="OnCloseTab" pref-width="14" hover-hint="Close tab"/>
-    </horizontal>
-    <horizontal id="groupControls" spacing="1" pref-height="10" child-expand-width="false">
-      <button text="Browse" on-click="OnBrowseGroup" pref-width="60"/>
-      <button text="View" on-click="OnViewGroup" pref-width="60"/>
-    </horizontal>
-    <horizontal id="browseControls" spacing="1" pref-height="10" child-expand-width="false">
-      <button text="Reload" on-click="OnReload" pref-width="22"/>
-      <button text="Home" on-click="OnHome" pref-width="20"/>
-      <button text="Keyboard" on-click="OnKeyboard" pref-width="28" hover-hint="Show or hide the keyboard"/>
-      <button text="History" on-click="OnHistory" pref-width="32"/>
-    </horizontal>
-    <horizontal id="viewControls" spacing="1" pref-height="10" child-expand-width="false">
-      <button text="Aspect" on-click="OnAspect" pref-width="28"/>
-      <button text="Zoom -" on-click="OnZoomDown" pref-width="32"/>
-      <button text="Zoom +" on-click="OnZoomUp" pref-width="32"/>
-    </horizontal>
-    <horizontal id="viewStatus" spacing="1" pref-height="10" child-expand-width="false">
-      <button text="Fade -" on-click="OnOpacityDown" pref-width="28" hover-hint="Decrease opacity"/>
-      <button text="Fade +" on-click="OnOpacityUp" pref-width="28" hover-hint="Increase opacity"/>
-      <text id="opacityText" text="100%" font-size="3.5" pref-width="18"/>
-      <text id="shapeText" text="Free / 100%" font-size="3.5" pref-width="62"/>
-    </horizontal>
-    <text id="titleText" text="Loading..." font-size="3.5" pref-height="5" align="Left"/>
+  <vertical pad="3" child-align="MiddleCenter" child-expand-height="false" child-control-height="true">
     <raw-image id="pageImage" pref-width="144" pref-height="81"/>
   </vertical>
 </bg>
 )xml";
+
+void SetSize(Component* c, float width, float height) {
+    auto go = c->gameObject;
+    auto le = go->GetComponent<UI::LayoutElement*>();
+    if (!le) le = go->AddComponent<UI::LayoutElement*>();
+    le->preferredWidth = width;
+    le->minWidth = width;
+    le->flexibleWidth = 0.0f;
+    le->preferredHeight = height;
+    le->minHeight = height;
+}
+
+UI::Button* Button(Transform* parent, std::string_view text, float width, std::function<void()> onClick) {
+    auto button = BSML::Lite::CreateUIButton(parent, std::string(text), Vector2(0, 0), Vector2(width, 9), std::move(onClick));
+    SetSize(button, width, 9.0f);
+    if (auto label = button->GetComponentInChildren<TMPro::TextMeshProUGUI*>()) {
+        label->richText = false;
+        label->fontStyle = TMPro::FontStyles::Normal;
+        label->enableWordWrapping = false;
+        label->overflowMode = TMPro::TextOverflowModes::Ellipsis;
+        label->fontSize = 3.4f;
+    }
+    return button;
+}
+
+UI::HorizontalLayoutGroup* Row(Transform* parent) {
+    auto row = BSML::Lite::CreateHorizontalLayoutGroup(parent);
+    row->spacing = 1.0f;
+    row->childForceExpandWidth = false;
+    row->childControlWidth = true;
+    row->childAlignment = TextAnchor::MiddleCenter;
+    SetSize(row, 136.0f, 10.0f);
+    return row;
+}
+
+TMPro::TextMeshProUGUI* Label(Transform* parent, std::string_view text, float width) {
+    auto label = BSML::Lite::CreateText(parent, std::string(text), 3.4f);
+    label->fontStyle = TMPro::FontStyles::Normal;
+    label->alignment = TMPro::TextAlignmentOptions::Center;
+    label->enableWordWrapping = false;
+    SetSize(label, width, 9.0f);
+    return label;
+}
 
 }  // namespace
 
@@ -95,41 +112,30 @@ BrowserScreen* BrowserScreen::CreateIn(Transform* parent) {
     BSML::parse_and_construct(kLayout, parent, screen);
     screen->history = Config::GetHistory();
     screen->canvasGroup->alpha = Config::GetOpacity();
-    screen->ChangeOpacity(0.0f);
-    if (auto row = screen->tabControls) {
-        for (int i = 0; i < row->transform->childCount; ++i) {
-            auto button = row->transform->GetChild(i)->GetComponent<UI::Button*>();
-            if (!button) continue;
-            auto label = button->GetComponentInChildren<TMPro::TextMeshProUGUI*>();
-            if (i < Tabs::kStripSlots) {
-                if (label) {
-                    label->richText = false;
-                    label->enableWordWrapping = false;
-                    label->fontStyle = TMPro::FontStyles::Normal;
-                }
-                screen->tabButtons.push_back(button);
-                screen->tabLabels.push_back(label);
-            } else if (i == Tabs::kStripSlots) {
-                screen->newTabButton = button;
-            }
-        }
-    }
-    for (auto row : {screen->mainControls, screen->tabControls, screen->groupControls, screen->browseControls, screen->viewControls, screen->viewStatus}) {
-        if (!row) continue;
-        for (int i = 0; i < row->transform->childCount; ++i) {
-            auto child = row->transform->GetChild(i);
-            auto layout = child->GetComponent<UI::LayoutElement*>();
-            if (layout) screen->controlSizes.push_back({layout, layout->preferredWidth});
-            auto label = child->GetComponentInChildren<TMPro::TextMeshProUGUI*>();
-            if (label) screen->controlLabels.push_back(label);
-        }
-    }
-    screen->RefreshControls();
+    // Order of creation follows the Panel enum: Tabs, Menu, History.
+    screen->BuildTabs();
+    screen->BuildMenu();
     screen->BuildHistory();
     auto parentRect = parent->GetComponent<RectTransform*>();
-    screen->keyboard = KeyboardPanel::Create(parent, parentRect ? parentRect->rect.height : 100.0f);
+    screen->keyboard = KeyboardPanel::Create(parent, parentRect ? parentRect->rect.height : 87.0f);
+    screen->toolbar = ToolbarPanel::Create(parent, screen->keyboard.ptr(), screen->MakeToolbarActions());
     screen->Setup();
     return screen;
+}
+
+ToolbarActions BrowserScreen::MakeToolbarActions() {
+    ToolbarActions a;
+    a.back = []() { Jni::GoBack(); };
+    a.forward = []() { Jni::GoForward(); };
+    a.reload = []() { Jni::Reload(); };
+    a.editUrl = [this]() { OpenUrlEditing(); };
+    a.toggleTabs = [this]() { ShowPanel(openPanel == Panel::Tabs ? Panel::None : Panel::Tabs); };
+    a.toggleMenu = [this]() { ShowPanel(openPanel == Panel::Menu ? Panel::None : Panel::Menu); };
+    a.label = [this]() { return ToolbarLabel(); };
+    a.tabCount = [this]() { return static_cast<int>(std::max<std::size_t>(1, tabUrls.size())); };
+    a.pinned = [this]() { return openPanel != Panel::None || (keyboard && keyboard->IsVisible()); };
+    a.interactive = [this]() { return interactive && !chromeHidden; };
+    return a;
 }
 
 void BrowserScreen::SetInteractive(bool value) {
@@ -145,6 +151,12 @@ void BrowserScreen::SetInteractive(bool value) {
         triggerHeld = false;
     }
     if (ready && isActiveAndEnabled) Jni::SetFrameRate(Logic::FrameRateFor(value));
+}
+
+void BrowserScreen::SetChromeHidden(bool hidden) {
+    if (hidden == chromeHidden) return;
+    chromeHidden = hidden;
+    if (hidden) ShowPanel(Panel::None);
 }
 
 void BrowserScreen::Setup() {
@@ -173,7 +185,7 @@ void BrowserScreen::Setup() {
     logger.info("Restored {} tabs, tab {} open", tabs.urls.size(), tabs.active + 1);
 #endif
     if (!ready) {
-        if (titleText) titleText->text = "Browser failed to start. See the log for details.";
+        logger.error("Browser failed to start");
         return;
     }
 #ifdef QB_DEBUG_SHOW_KEYBOARD
@@ -184,6 +196,8 @@ void BrowserScreen::Setup() {
 }
 
 void BrowserScreen::OnEnable() {
+    // The toolbar is not a child of the window, so show it with the window.
+    if (toolbar) toolbar->SetShown(true);
     if (!ready || counted || !isActiveAndEnabled) return;
     counted = true;
     if (auto change = activeScreens.Add()) Jni::SetActive(*change);
@@ -191,8 +205,9 @@ void BrowserScreen::OnEnable() {
 }
 
 void BrowserScreen::OnDisable() {
-    // The keyboard is not a child of the window, so hide it with the window.
+    // The keyboard and the toolbar are not children of the window, so hide them with it.
     if (keyboard) keyboard->SetVisible(false);
+    if (toolbar) toolbar->SetShown(false);
     if (counted) {
         counted = false;
         if (auto change = activeScreens.Remove()) Jni::SetActive(*change);
@@ -208,7 +223,6 @@ void BrowserScreen::OnDisable() {
 
 void BrowserScreen::Update() {
     if (!ready) return;
-    UpdateControlScale();
     UpdateTexture();
     UpdateInput();
     UpdateLabels();
@@ -219,23 +233,24 @@ void BrowserScreen::Update() {
 void BrowserScreen::SetDimensions(Resize::Dimensions size) {
     if (dimensions.width == size.width && dimensions.height == size.height && !viewportDirty) return;
     dimensions = size;
+    float pageWidth = size.width - Resize::kPaddingWidth;
+    float pageHeight = std::max(81.0f, size.height - GetChromeHeight());
     if (pageImage) {
         auto layout = pageImage->gameObject->GetComponent<UI::LayoutElement*>();
         if (layout) {
-            layout->preferredWidth = size.width - Resize::kPaddingWidth;
-            layout->preferredHeight = std::max(81.0f, size.height - GetChromeHeight());
+            layout->preferredWidth = pageWidth;
+            layout->preferredHeight = pageHeight;
             layout->minWidth = 0;
             layout->minHeight = 0;
         }
     }
-    if (historyPanel) {
-        auto layout = historyPanel->GetComponent<UI::LayoutElement*>();
-        if (layout) {
-            layout->preferredWidth = size.width - Resize::kPaddingWidth;
-            layout->preferredHeight = std::max(81.0f, size.height - GetChromeHeight());
-        }
+    for (auto& panel : panelSizes) {
+        if (!panel) continue;
+        panel->preferredWidth = pageWidth;
+        panel->preferredHeight = pageHeight;
     }
     if (keyboard) keyboard->SetWindowHeight(size.height);
+    if (toolbar) toolbar->SetWindowSize(size.width, size.height);
     viewportDirty = true;
 }
 
@@ -251,72 +266,20 @@ void BrowserScreen::ApplyViewport() {
     Jni::SetViewport(static_cast<int>(w * limit + 0.5f), static_cast<int>(h * limit + 0.5f));
     viewportDirty = false;
     viewportTimer = 0.15f;
-    constexpr char const* names[] = {"Free", "16:9", "4:3", "Portrait"};
-    if (shapeText) shapeText->text = fmt::format("{} / {}%", names[Window::GetAspectPreset()], static_cast<int>(Config::GetZoom() * 100 + 0.5f));
+    RefreshMenu();
 }
 
-void BrowserScreen::OnAspect() { Window::CycleAspectPreset(); viewportDirty = true; }
-void BrowserScreen::ChangeZoom(float delta) { Config::SetZoom(Config::GetZoom() + delta); viewportDirty = true; }
-void BrowserScreen::OnZoomDown() { ChangeZoom(-0.1f); }
-void BrowserScreen::OnZoomUp() { ChangeZoom(0.1f); }
-
-float BrowserScreen::GetChromeHeight() const {
-    // Toolbar and tab strip, plus the menu rows when the menu is open.
-    int rows = 2 + (menuOpen ? (viewOpen ? 3 : 2) : 0);
-    return 12.0f + rows * (10.0f * controlScale + 1.0f);
-}
-
-void BrowserScreen::SetChromeHidden(bool hidden) {
-    if (hidden == chromeHidden) return;
-    chromeHidden = hidden;
-    if (hidden && historyPanel && historyPanel->activeSelf) OnHistory();
-    RefreshControls();
-}
-
-void BrowserScreen::RefreshControls() {
-    bool show = !chromeHidden;
-    if (mainControls) mainControls->gameObject->SetActive(show);
-    if (tabControls) tabControls->gameObject->SetActive(show);
-    if (titleText) titleText->gameObject->SetActive(show);
-    if (groupControls) groupControls->gameObject->SetActive(show && menuOpen);
-    if (browseControls) browseControls->gameObject->SetActive(show && menuOpen && !viewOpen);
-    if (viewControls) viewControls->gameObject->SetActive(show && menuOpen && viewOpen);
-    if (viewStatus) viewStatus->gameObject->SetActive(show && menuOpen && viewOpen);
-    for (auto& size : controlSizes) {
-        size.layout->preferredWidth = size.width * controlScale;
-        size.layout->minWidth = size.width * controlScale;
-        size.layout->preferredHeight = 10 * controlScale;
-        size.layout->minHeight = 10 * controlScale;
-    }
-    for (auto label : controlLabels) if (label) {
-        label->enableAutoSizing = false;
-        label->fontSize = 3.5f * controlScale;
-    }
-    for (auto row : {mainControls, tabControls, groupControls, browseControls, viewControls, viewStatus}) if (row) {
-        auto layout = row->GetComponent<UI::LayoutElement*>();
-        if (layout) {
-            layout->preferredHeight = 10 * controlScale;
-            layout->minHeight = 10 * controlScale;
-        }
-        row->spacing = controlScale;
-    }
+void BrowserScreen::ChangeZoom(float delta) {
+    Config::SetZoom(Config::GetZoom() + delta);
     viewportDirty = true;
-    Window::FitControls();
+    RefreshMenu();
 }
 
-void BrowserScreen::UpdateControlScale() {
-    auto camera = Camera::get_main();
-    if (!camera) return;
-    auto offset = Vector3::op_Subtraction(transform->position, camera->transform->position);
-    float next = Resize::ControlScale(offset.magnitude, transform->lossyScale.x);
-    if (std::fabs(next - controlScale) < 0.05f) return;
-    controlScale = next;
-    RefreshControls();
+void BrowserScreen::ChangeOpacity(float delta) {
+    if (delta != 0.0f) Config::SetOpacity(Config::GetOpacity() + delta);
+    if (canvasGroup) canvasGroup->alpha = Config::GetOpacity();
+    RefreshMenu();
 }
-
-void BrowserScreen::OnMenu() { menuOpen = !menuOpen; RefreshControls(); }
-void BrowserScreen::OnBrowseGroup() { viewOpen = false; RefreshControls(); }
-void BrowserScreen::OnViewGroup() { viewOpen = true; RefreshControls(); }
 
 void BrowserScreen::UpdateTexture() {
     if (!texture) return;
@@ -365,11 +328,12 @@ void BrowserScreen::UpdateInput() {
     float trigger = controller->triggerValue;
     bool wasHeld = triggerHeld;
     triggerHeld = triggerHeld ? trigger > kTriggerRelease : trigger > kTriggerPress;
+    // A click outside the window, the toolbar and the keyboard closes the keyboard.
     if (triggerHeld && !wasHeld && keyboard && keyboard->IsVisible()) {
         auto target = over ? over->transform : nullptr;
-        bool inWindow = target && target->IsChildOf(transform);
-        bool inKeyboard = target && target->IsChildOf(keyboard->transform);
-        if (!inWindow && !inKeyboard) HideKeyboard();
+        bool inside = target && (target->IsChildOf(transform) || target->IsChildOf(keyboard->transform) ||
+                                 (toolbar && target->IsChildOf(toolbar->transform)));
+        if (!inside) HideKeyboard();
     }
 
     switch (tracker.Update(triggerHeld, hit)) {
@@ -414,43 +378,33 @@ void BrowserScreen::UpdateLabels() {
     }
     // The user tapped a text field in the page.
     if (Jni::TakeKeyboardRequest() && interactive && keyboard) keyboard->SetVisible(true);
-    if (!titleText) return;
-
-    // While the address is typed, show it here: the address field is not drawn.
-    if (auto draft = Jni::GetUrlDraft()) {
-        titleText->text = fmt::format("URL: {}_", *draft);
-        return;
-    }
 
     auto url = Jni::GetUrl();
-
     if (Jni::GetProgress() == 100 && !url.empty() && url != lastHistoryUrl) {
         lastHistoryUrl = url;
         Logic::RememberUrl(history, url);
         Config::SetHistory(history);
-        if (historyPanel && historyPanel->activeSelf) RefreshHistory();
+        if (openPanel == Panel::History) RefreshHistory();
     }
-
-    auto title = Jni::GetTitle();
-    int progress = Jni::GetProgress();
-    std::string label = title.empty() ? url : title;
-    if (progress < 100) label = fmt::format("[{}%] {}", progress, label);
-    if (label.size() > 120) label = label.substr(0, 117) + "...";
-    titleText->text = label;
 }
 
-void BrowserScreen::OnBack() { Jni::GoBack(); }
-void BrowserScreen::OnForward() { Jni::GoForward(); }
-void BrowserScreen::OnReload() { Jni::Reload(); }
-void BrowserScreen::OnHome() { Jni::LoadUrl(Logic::kHomeUrl); }
+// Text in the toolbar: the address being typed, else the page title (or address).
+std::string BrowserScreen::ToolbarLabel() {
+    if (auto draft = Jni::GetUrlDraft()) return fmt::format("{}_", *draft);
+    auto title = Jni::GetTitle();
+    std::string label = title.empty() ? Jni::GetUrl() : title;
+    int progress = Jni::GetProgress();
+    if (progress < 100) label = fmt::format("{}%  {}", progress, label);
+    return label;
+}
 
-void BrowserScreen::OnUrl() {
+void BrowserScreen::OpenUrlEditing() {
+    ShowPanel(Panel::None);
     Jni::BeginUrlEditing(Jni::GetUrl());
     if (keyboard) keyboard->SetVisible(true);
 }
 
-void BrowserScreen::OnKeyboard() {
-    logger.info("Keyboard button pressed (keyboard {})", keyboard ? (keyboard->IsVisible() ? "visible" : "hidden") : "missing");
+void BrowserScreen::ToggleKeyboard() {
     if (keyboard && keyboard->IsVisible()) HideKeyboard();
     else if (keyboard) keyboard->SetVisible(true);
 }
@@ -460,101 +414,185 @@ void BrowserScreen::HideKeyboard() {
     if (keyboard) keyboard->SetVisible(false);
 }
 
-void BrowserScreen::BuildHistory() {
-    if (!pageImage) return;
+// ---- Panels ----------------------------------------------------------------
+
+GameObject* BrowserScreen::MakePanel() {
     auto panel = BSML::Lite::CreateVerticalLayoutGroup(pageImage->transform->parent);
     panel->spacing = 1.0f;
     panel->childForceExpandHeight = false;
     panel->childControlHeight = true;
+    panel->childAlignment = TextAnchor::MiddleCenter;
     auto size = panel->gameObject->GetComponent<UI::LayoutElement*>();
     if (!size) size = panel->gameObject->AddComponent<UI::LayoutElement*>();
-    size->preferredHeight = 81.0f;
     size->preferredWidth = 144.0f;
-    historyPanel = panel->gameObject;
-    historyStatus = BSML::Lite::CreateText(panel->transform, "History", 3.5f);
-    for (std::size_t row = 0; row < 5; ++row) {
-        auto line = BSML::Lite::CreateHorizontalLayoutGroup(panel->transform);
-        line->childForceExpandWidth = false;
-        auto lineSize = line->gameObject->GetComponent<UI::LayoutElement*>();
-        if (!lineSize) lineSize = line->gameObject->AddComponent<UI::LayoutElement*>();
-        lineSize->preferredHeight = 11.0f;
-        lineSize->minHeight = 11.0f;
-        auto open = BSML::Lite::CreateUIButton(line->transform, "", Vector2(0, 0), Vector2(116, 10), [this, row]() {
-            auto index = historyPage * 5 + row;
+    size->preferredHeight = 81.0f;
+    panels.push_back(panel->gameObject);
+    panelSizes.push_back(size);
+    panel->gameObject->SetActive(false);
+    return panel->gameObject;
+}
+
+void BrowserScreen::ShowPanel(Panel panel) {
+    if (panel != Panel::None) HideKeyboard();
+    openPanel = panel;
+    for (std::size_t i = 0; i < panels.size(); ++i)
+        if (panels[i]) panels[i]->SetActive(static_cast<int>(panel) == static_cast<int>(i) + 1);
+    if (pageImage) pageImage->gameObject->SetActive(panel == Panel::None);
+    if (panel == Panel::Tabs) RefreshTabs();
+    if (panel == Panel::Menu) RefreshMenu();
+    if (panel == Panel::History) RefreshHistory();
+}
+
+void BrowserScreen::BuildMenu() {
+    auto panel = MakePanel()->transform;
+    Label(panel, "Menu", 60.0f);
+
+    auto nav = Row(panel);
+    Button(nav->transform, "Home", 33.0f, [this]() {
+        ShowPanel(Panel::None);
+        Jni::LoadUrl(Logic::kHomeUrl);
+    });
+    Button(nav->transform, "History", 33.0f, [this]() { ShowPanel(Panel::History); });
+    Button(nav->transform, "Keyboard", 33.0f, [this]() {
+        ShowPanel(Panel::None);
+        ToggleKeyboard();
+    });
+
+    auto zoom = Row(panel);
+    Button(zoom->transform, "-", 14.0f, [this]() { ChangeZoom(-0.1f); });
+    zoomText = Label(zoom->transform, "", 44.0f);
+    Button(zoom->transform, "+", 14.0f, [this]() { ChangeZoom(0.1f); });
+
+    auto fade = Row(panel);
+    Button(fade->transform, "-", 14.0f, [this]() { ChangeOpacity(-0.1f); });
+    opacityText = Label(fade->transform, "", 44.0f);
+    Button(fade->transform, "+", 14.0f, [this]() { ChangeOpacity(0.1f); });
+
+    auto shape = Row(panel);
+    aspectText = Label(shape->transform, "", 44.0f);
+    Button(shape->transform, "Change", 28.0f, [this]() {
+        Window::CycleAspectPreset();
+        viewportDirty = true;
+        RefreshMenu();
+    });
+    Button(shape->transform, "Close", 28.0f, [this]() { ShowPanel(Panel::None); });
+}
+
+void BrowserScreen::RefreshMenu() {
+    constexpr char const* names[] = {"Free", "16:9", "4:3", "Portrait"};
+    if (zoomText) zoomText->text = fmt::format("Zoom {}%", static_cast<int>(Config::GetZoom() * 100 + 0.5f));
+    if (opacityText) opacityText->text = fmt::format("Opacity {}%", static_cast<int>(Config::GetOpacity() * 100 + 0.5f));
+    if (aspectText) aspectText->text = fmt::format("Shape: {}", names[std::clamp(Window::GetAspectPreset(), 0, 3)]);
+}
+
+void BrowserScreen::BuildHistory() {
+    auto panel = MakePanel()->transform;
+    historyStatus = Label(panel, "History", 120.0f);
+    for (std::size_t row = 0; row < kRows; ++row) {
+        auto line = Row(panel);
+        auto open = Button(line->transform, "", 108.0f, [this, row]() {
+            auto index = historyPage * kRows + row;
             if (index >= history.size()) return;
             auto url = history[index];
-            OnHistory();
+            ShowPanel(Panel::None);
             Jni::LoadUrl(url);
         });
-        auto label = open->GetComponentInChildren<TMPro::TextMeshProUGUI*>();
-        if (label) { label->richText = false; label->fontSize = 2.7f; label->enableWordWrapping = false; }
-        historyLabels.push_back(label);
+        historyLabels.push_back(open->GetComponentInChildren<TMPro::TextMeshProUGUI*>());
         historyOpenButtons.push_back(open);
-        historyDeleteButtons.push_back(BSML::Lite::CreateUIButton(line->transform, "Delete", Vector2(0, 0), Vector2(25, 10), [this, row]() {
-            auto index = historyPage * 5 + row;
+        historyDeleteButtons.push_back(Button(line->transform, "Delete", 26.0f, [this, row]() {
+            auto index = historyPage * kRows + row;
             if (index >= history.size()) return;
             history.erase(history.begin() + index);
             Config::SetHistory(history);
             RefreshHistory();
         }));
-        // Layout groups use LayoutElement sizes rather than the button's rect size.
-        for (auto button : {open, historyDeleteButtons.back().ptr()}) {
-            auto layout = button->gameObject->GetComponent<UI::LayoutElement*>();
-            if (!layout) layout = button->gameObject->AddComponent<UI::LayoutElement*>();
-            layout->preferredWidth = button == open ? 116.0f : 25.0f;
-            layout->minWidth = layout->preferredWidth;
-            layout->flexibleWidth = 0.0f;
-            layout->preferredHeight = 10.0f;
-        }
     }
-    auto controls = BSML::Lite::CreateHorizontalLayoutGroup(panel->transform);
-    BSML::Lite::CreateUIButton(controls->transform, "Newer", [this]() {
+    auto controls = Row(panel);
+    Button(controls->transform, "Newer", 30.0f, [this]() {
         if (historyPage) --historyPage;
         RefreshHistory();
     });
-    BSML::Lite::CreateUIButton(controls->transform, "Older", [this]() {
-        if ((historyPage + 1) * 5 < history.size()) ++historyPage;
+    Button(controls->transform, "Older", 30.0f, [this]() {
+        if ((historyPage + 1) * kRows < history.size()) ++historyPage;
         RefreshHistory();
     });
-    BSML::Lite::CreateUIButton(controls->transform, "Clear all", [this]() {
+    Button(controls->transform, "Clear all", 34.0f, [this]() {
         history.clear();
         Config::SetHistory(history);
         RefreshHistory();
     });
-    BSML::Lite::CreateUIButton(controls->transform, "Close", [this]() { OnHistory(); });
-    historyPanel->SetActive(false);
+    Button(controls->transform, "Close", 30.0f, [this]() { ShowPanel(Panel::None); });
 }
 
 void BrowserScreen::RefreshHistory() {
-    historyPage = std::min(historyPage, history.empty() ? std::size_t(0) : (history.size() - 1) / 5);
-    if (historyStatus) historyStatus->text = history.empty() ? "No browsing history" : fmt::format("History - page {}/{} ({} URLs)", historyPage + 1, (history.size() + 4) / 5, history.size());
+    historyPage = std::min(historyPage, history.empty() ? std::size_t(0) : (history.size() - 1) / kRows);
+    if (historyStatus)
+        historyStatus->text = history.empty() ? "No history"
+                                              : fmt::format("History  {}/{}", historyPage + 1, (history.size() + kRows - 1) / kRows);
     for (std::size_t row = 0; row < historyLabels.size(); ++row) {
-        auto index = historyPage * 5 + row;
+        auto index = historyPage * kRows + row;
         bool exists = index < history.size();
-        historyOpenButtons[row]->interactable = exists;
-        historyDeleteButtons[row]->interactable = exists;
+        historyOpenButtons[row]->gameObject->SetActive(exists);
+        historyDeleteButtons[row]->gameObject->SetActive(exists);
         if (historyLabels[row]) historyLabels[row]->text = exists ? history[index] : "";
     }
 }
 
-void BrowserScreen::OnHistory() {
-    if (!historyPanel || !pageImage) return;
-    HideKeyboard();
-    bool show = !historyPanel->activeSelf;
-    pageImage->gameObject->SetActive(!show);
-    historyPanel->SetActive(show);
-    if (show) RefreshHistory();
-}
-
-void BrowserScreen::ChangeOpacity(float delta) {
-    if (delta != 0.0f) Config::SetOpacity(Config::GetOpacity() + delta);
-    if (canvasGroup) canvasGroup->alpha = Config::GetOpacity();
-    if (opacityText) opacityText->text = fmt::format("{}%", static_cast<int>(Config::GetOpacity() * 100.0f + 0.5f));
-}
-void BrowserScreen::OnOpacityDown() { ChangeOpacity(-0.1f); }
-void BrowserScreen::OnOpacityUp() { ChangeOpacity(0.1f); }
-
 // ---- Tabs ------------------------------------------------------------------
+
+void BrowserScreen::BuildTabs() {
+    auto panel = MakePanel()->transform;
+    tabsStatus = Label(panel, "Tabs", 120.0f);
+    for (std::size_t row = 0; row < kRows; ++row) {
+        auto line = Row(panel);
+        auto open = Button(line->transform, "", 112.0f, [this, row]() {
+            int index = static_cast<int>(tabsPage * kRows + row);
+            if (index >= static_cast<int>(tabUrls.size())) return;
+            ShowPanel(Panel::None);
+            if (index != activeTab) Jni::SelectTab(index);
+        });
+        tabLabels.push_back(open->GetComponentInChildren<TMPro::TextMeshProUGUI*>());
+        tabOpenButtons.push_back(open);
+        tabCloseButtons.push_back(Button(line->transform, "x", 14.0f, [this, row]() {
+            CloseTab(static_cast<int>(tabsPage * kRows + row));
+        }));
+    }
+    auto controls = Row(panel);
+    newTabButton = Button(controls->transform, "+ New tab", 40.0f, [this]() {
+        if (!Tabs::CanAddTab(static_cast<int>(tabUrls.size()))) return;
+        ShowPanel(Panel::None);
+        Jni::NewTab(Logic::kHomeUrl);
+        // Ready to type where to go.
+        Jni::BeginUrlEditing("");
+        if (keyboard) keyboard->SetVisible(true);
+    });
+    Button(controls->transform, "<", 14.0f, [this]() {
+        if (tabsPage) --tabsPage;
+        RefreshTabs();
+    });
+    Button(controls->transform, ">", 14.0f, [this]() {
+        if ((tabsPage + 1) * kRows < tabUrls.size()) ++tabsPage;
+        RefreshTabs();
+    });
+    Button(controls->transform, "Close", 28.0f, [this]() { ShowPanel(Panel::None); });
+}
+
+void BrowserScreen::RefreshTabs() {
+    std::size_t count = tabUrls.size();
+    tabsPage = std::min(tabsPage, count == 0 ? std::size_t(0) : (count - 1) / kRows);
+    if (tabsStatus) tabsStatus->text = fmt::format("Tabs  {}/{}", count, Tabs::kMaxTabs);
+    for (std::size_t row = 0; row < tabLabels.size(); ++row) {
+        auto index = tabsPage * kRows + row;
+        bool exists = index < count;
+        tabOpenButtons[row]->gameObject->SetActive(exists);
+        tabCloseButtons[row]->gameObject->SetActive(exists);
+        if (!exists || !tabLabels[row]) continue;
+        std::string title = index < tabTitles.size() ? tabTitles[index] : "";
+        tabLabels[row]->text = Tabs::Label(title, tabUrls[index], 60);
+        tabLabels[row]->color = static_cast<int>(index) == activeTab ? kAccent : kWhite;
+    }
+    if (newTabButton) newTabButton->interactable = Tabs::CanAddTab(static_cast<int>(count));
+}
 
 void BrowserScreen::UpdateTabs() {
     int version = Jni::GetTabsVersion();
@@ -567,54 +605,18 @@ void BrowserScreen::UpdateTabs() {
     if (!urls.empty() && (urls != tabUrls || active != activeTab)) Config::SetTabs(urls, active);
     tabUrls = std::move(urls);
     activeTab = active;
-    RefreshTabStrip();
+    if (openPanel == Panel::Tabs) RefreshTabs();
 }
 
-void BrowserScreen::RefreshTabStrip() {
+void BrowserScreen::CloseTab(int index) {
     int count = static_cast<int>(tabUrls.size());
-    stripRange = Tabs::VisibleRange(count, activeTab, static_cast<int>(tabButtons.size()));
-    for (int slot = 0; slot < static_cast<int>(tabButtons.size()); ++slot) {
-        int index = stripRange.begin + slot;
-        bool used = index < stripRange.end;
-        if (tabButtons[slot]) tabButtons[slot]->gameObject->SetActive(used);
-        if (!used || !tabLabels[slot]) continue;
-        std::string title = index < static_cast<int>(tabTitles.size()) ? tabTitles[index] : "";
-        auto label = Tabs::Label(title, tabUrls[index], 14);
-        // Mark the open tab, and show that there are more tabs past the edges.
-        if (slot == 0 && stripRange.begin > 0) label = "< " + label;
-        if (slot == stripRange.end - stripRange.begin - 1 && stripRange.end < count) label += " >";
-        tabLabels[slot]->text = label;
-        tabLabels[slot]->color = index == activeTab ? Color(0.25f, 0.85f, 1.0f, 1.0f) : Color(1.0f, 1.0f, 1.0f, 1.0f);
-    }
-    if (newTabButton) newTabButton->interactable = Tabs::CanAddTab(count);
-}
-
-void BrowserScreen::OnTabSlot(int slot) {
-    int index = stripRange.begin + slot;
-    if (index < stripRange.end && index != activeTab) Jni::SelectTab(index);
-}
-
-void BrowserScreen::OnTab0() { OnTabSlot(0); }
-void BrowserScreen::OnTab1() { OnTabSlot(1); }
-void BrowserScreen::OnTab2() { OnTabSlot(2); }
-void BrowserScreen::OnTab3() { OnTabSlot(3); }
-
-void BrowserScreen::OnNewTab() {
-    if (!Tabs::CanAddTab(static_cast<int>(tabUrls.size()))) return;
-    Jni::NewTab(Logic::kHomeUrl);
-    // Ready to type where to go.
-    Jni::BeginUrlEditing("");
-    if (keyboard) keyboard->SetVisible(true);
-}
-
-void BrowserScreen::OnCloseTab() {
-    int count = static_cast<int>(tabUrls.size());
+    if (index < 0 || index >= count) return;
     if (count <= 1) {
         // Keep one tab: closing the last one goes back to the home page.
         Jni::LoadUrl(Logic::kHomeUrl);
         return;
     }
-    Jni::CloseTab(activeTab, Tabs::ActiveAfterClose(count, activeTab, activeTab));
+    Jni::CloseTab(index, Tabs::ActiveAfterClose(count, activeTab, index));
 }
 
 }  // namespace QuestBrowser

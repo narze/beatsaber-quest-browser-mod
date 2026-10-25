@@ -68,6 +68,15 @@ void SetBool(char const* key, bool value) {
 void Load() {
     Get().Load();
     if (!Doc().IsObject()) Doc().SetObject();
+    // Layout 2: the toolbar left the window, so saved heights lose the old toolbar rows.
+    if (GetFloat("layoutVersion", 1) < 2) {
+        for (auto slot : {Logic::PoseSlot::Menu, Logic::PoseSlot::Song}) {
+            auto key = Key(slot, "height");
+            if (Doc().HasMember(key.c_str())) SetFloat(key, Resize::MigrateHeight(GetFloat(key, 0)));
+        }
+        SetFloat("layoutVersion", 2);
+        Get().Write();
+    }
 }
 
 bool GetVisible() { return GetBool("visible", true); }
@@ -126,7 +135,8 @@ void ResetPoses() {
 }
 
 Resize::Dimensions GetDimensions(Logic::PoseSlot slot) {
-    return Resize::DimensionsFromDrag({GetFloat(Key(slot, "width"), 150), GetFloat(Key(slot, "height"), 126)}, 0, 0, 0, 0, 0);
+    Resize::Dimensions d;
+    return Resize::DimensionsFromDrag({GetFloat(Key(slot, "width"), d.width), GetFloat(Key(slot, "height"), d.height)}, 0, 0, 0, 0, 0);
 }
 void SetDimensions(Logic::PoseSlot slot, Resize::Dimensions size) {
     SetFloat(Key(slot, "width"), size.width);

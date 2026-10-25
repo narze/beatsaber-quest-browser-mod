@@ -13,8 +13,6 @@ struct Point {
 
 // Top of the song selection screens in the main menu, in meters (estimate).
 constexpr float kSongSelectionTop = 2.6f;
-// The move handle hangs about this far below the window.
-constexpr float kHandleDrop = 0.1f;
 
 // Centered in front of the player and high enough to clear the song selection.
 // In songs, this is above the note track and the pause menu.

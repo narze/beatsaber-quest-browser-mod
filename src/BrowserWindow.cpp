@@ -24,7 +24,7 @@ namespace {
 
 // Fits the layout in BrowserScreen.cpp: 144 x 81 page, toolbar, title, padding.
 // At the default scale, about 1.8 m wide. Grips change dimensions, not scale.
-constexpr Vector2 kScreenSize{150.0f, 126.0f};
+constexpr Vector2 kScreenSize{150.0f, 87.0f};
 
 Logic::Context context = Logic::Context::Menu;
 std::optional<Logic::PoseSlot> placedFor;
@@ -114,16 +114,9 @@ void Apply() {
     PlaceHandle();
     for (auto& grip : resizeGrips) if (grip) grip->gameObject->SetActive(state.showHandle);
     if (browserScreen) {
-        bool wasCompact = browserScreen->IsChromeHidden();
-        // While a song plays only the page shows; the controls come back on pause.
+        // While a song plays only the page shows; the toolbar comes back on pause.
         browserScreen->SetChromeHidden(!state.interactive);
         browserScreen->SetInteractive(state.interactive);
-        if (wasCompact && state.interactive && placedFor) {
-            ApplyDimensions(Config::GetDimensions(*placedFor), false);
-            FitControls();
-        } else if (!state.interactive) {
-            FitControls();
-        }
     }
 }
 
@@ -147,13 +140,6 @@ float GetControlScale() { return browserScreen ? browserScreen->GetControlScale(
 float GetChromeHeight() { return browserScreen ? browserScreen->GetChromeHeight() : Resize::kChromeHeight; }
 void FitControls() {
     if (!floatingScreen || !browserScreen) return;
-    if (browserScreen->IsChromeHidden()) {
-        // Play mode: just the page and its padding; the page keeps its size.
-        auto size = browserScreen->GetDimensions();
-        floatingScreen->set_ScreenSize({size.width, Resize::PlayModeHeight(size, GetChromeHeight())});
-        PlaceHandle();
-        return;
-    }
     auto rect = floatingScreen->GetComponent<RectTransform*>()->rect;
     ApplyDimensions(Resize::DimensionsFromDrag({rect.width, rect.height}, 0, 0, 0, 0,
                     Resize::AspectFor(GetAspectPreset()), GetControlScale(), GetChromeHeight()), false);

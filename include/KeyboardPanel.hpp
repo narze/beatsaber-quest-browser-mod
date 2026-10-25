@@ -26,6 +26,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, KeyboardPanel, UnityEngine::MonoBehaviour) {
     void SetVisible(bool visible);
     bool IsVisible();
     void SetWindowHeight(float height) { windowHeight = height; FollowAnchor(); }
+    // Extra space between the window and the keyboard, in window units (the toolbar).
+    void SetExtraOffset(float offset) { extraOffset = offset; }
 
    private:
     struct KeyButton {
@@ -41,6 +43,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, KeyboardPanel, UnityEngine::MonoBehaviour) {
 
     Keys::KeyboardState state;
     float windowHeight = 0.0f;
+    float extraOffset = 0.0f;
     UnityEngine::Vector2 panelSize{};
     std::vector<KeyButton> buttons;
 };
