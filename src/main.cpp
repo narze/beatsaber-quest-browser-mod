@@ -40,6 +40,11 @@ std::vector<SafePtrUnity<BSML::ToggleSetting>> visibleToggles;
 void BuildSettings(UnityEngine::Transform* parent) {
     auto container = BSML::Lite::CreateScrollableSettingsContainer(parent);
     auto c = container->transform;
+    BSML::Lite::CreateToggle(c, "Enable browser", Config::GetEnabled(), [](bool value) {
+        if (value == Config::GetEnabled()) return;
+        Config::SetEnabled(value);
+        Window::Refresh();
+    });
     visibleToggles.emplace_back(BSML::Lite::CreateToggle(c, "Show browser", Config::GetVisible(), [](bool value) {
         if (value == Config::GetVisible()) return;
         Config::SetVisible(value);

@@ -82,7 +82,7 @@ void EnsureCreated() {
 }
 
 void Apply() {
-    auto state = Logic::ScreenStateFor(context, Config::GetVisible(), Config::GetShowInSong());
+    auto state = Logic::ScreenStateFor(context, Config::GetEnabled(), Config::GetVisible(), Config::GetShowInSong());
     if (!state.visible) {
         if (floatingScreen) floatingScreen->gameObject->SetActive(false);
         return;

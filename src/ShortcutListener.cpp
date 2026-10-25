@@ -44,7 +44,7 @@ void ShortcutListener::EnsureCreated() {
 void ShortcutListener::Update() {
     auto preset = Keybind::Find(Config::GetResetKeybind());
     bool held = Keybind::IsHeld(preset, PressedButtons());
-    bool allowed = Shortcut::ShortcutAllowed(Window::CurrentContext(), preset.buttons != 0);
+    bool allowed = Shortcut::ShortcutAllowed(Window::CurrentContext(), preset.buttons != 0, Config::GetEnabled());
     // Unscaled: the game can stop time while paused.
     if (!hold.Update(held, UnityEngine::Time::get_unscaledDeltaTime(), allowed)) return;
     logger.info("Reset keybind ({}): reset browser position", preset.name);

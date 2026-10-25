@@ -166,3 +166,10 @@ TEST_CASE("history revisits move to front and oldest visits are bounded") {
     QuestBrowser::Logic::RememberUrl(urls, "");
     CHECK(urls.size() == 100);
 }
+
+TEST_CASE("ScreenStateFor: a disabled browser is hidden everywhere, whatever the other settings") {
+    for (auto context : {Context::Menu, Context::SongPlaying, Context::SongPaused}) {
+        CHECK_FALSE(ScreenStateFor(context, false, true, true).visible);
+        CHECK(ScreenStateFor(context, true, true, true).visible);
+    }
+}

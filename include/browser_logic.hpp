@@ -178,4 +178,9 @@ inline ScreenState ScreenStateFor(Context context, bool userVisible, bool showIn
     return {visible, interactive, interactive, inSong ? PoseSlot::Song : PoseSlot::Menu};
 }
 
+// enabled: the "Enable browser" setting. A disabled browser is hidden everywhere.
+inline ScreenState ScreenStateFor(Context context, bool enabled, bool userVisible, bool showInSong) {
+    return ScreenStateFor(context, enabled && userVisible, showInSong);
+}
+
 }  // namespace QuestBrowser::Logic

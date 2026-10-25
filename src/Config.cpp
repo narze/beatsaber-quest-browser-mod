@@ -79,6 +79,9 @@ void Load() {
     }
 }
 
+bool GetEnabled() { return GetBool("enabled", true); }
+void SetEnabled(bool value) { SetBool("enabled", value); }
+
 bool GetVisible() { return GetBool("visible", true); }
 void SetVisible(bool value) { SetBool("visible", value); }
 

@@ -20,6 +20,11 @@ struct Pose {
 
 void Load();
 
+// Master switch for the browser. Off: no window, no keybind; off at start, the
+// web view is not created at all.
+bool GetEnabled();
+void SetEnabled(bool value);
+
 // The menu button shows or hides the browser window.
 bool GetVisible();
 void SetVisible(bool value);

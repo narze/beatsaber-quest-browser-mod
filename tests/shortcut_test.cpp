@@ -40,3 +40,9 @@ TEST_CASE("ShortcutAllowed: menu and pause yes, playing no, off in settings no")
     CHECK_FALSE(ShortcutAllowed(Context::SongPlaying, true));
     CHECK_FALSE(ShortcutAllowed(Context::Menu, false));
 }
+
+TEST_CASE("ShortcutAllowed: never while the browser is disabled") {
+    using QuestBrowser::Logic::Context;
+    CHECK_FALSE(ShortcutAllowed(Context::Menu, true, false));
+    CHECK(ShortcutAllowed(Context::Menu, true, true));
+}
