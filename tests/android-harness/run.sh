@@ -62,6 +62,20 @@ adb pull "$DIR/frame1.png" "$OUT/frame1.png" >/dev/null
 adb pull "$DIR/frame2.png" "$OUT/frame2.png" >/dev/null
 
 echo "== Keyboard test"
+echo "== Viewport resize and remapped input test"
+adb logcat -c
+adb shell am force-stop "$PKG"
+adb shell am start -n "$PKG/.HarnessActivity" --es mode viewport >/dev/null
+vp=0
+for _ in $(seq 1 40); do
+    if adb logcat -d -s QBHarness:* | grep -q "VIEWPORT_DONE\|FAIL"; then break; fi
+    sleep 0.5
+done
+adb logcat -d -s QBHarness:* QuestBrowser:* > "$OUT/logcat-viewport.txt"
+for want in VIEWPORT_PORTRAIT_CLICK_OK VIEWPORT_WIDE_CLICK_OK VIEWPORT_DONE; do
+    grep -q "$want" "$OUT/logcat-viewport.txt" || { echo "FAIL: expected $want"; vp=1; }
+done
+
 waitlog() {
     for _ in $(seq 1 30); do
         if adb logcat -d -s QBHarness:* | grep -q "$1"; then return 0; fi
@@ -133,5 +147,6 @@ echo "Frames: $OUT/frame1.png $OUT/frame2.png"
 [ $vid -eq 0 ] || fail=1
 [ $fs -eq 0 ] || fail=1
 [ $http -eq 0 ] || fail=1
+[ $vp -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "PASS"
 exit $fail

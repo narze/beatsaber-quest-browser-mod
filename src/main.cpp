@@ -34,6 +34,7 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
     // Adds a "Browser" button to the mods list on the left of the main menu.
     // It shows or hides the browser window, which stays open in songs too.
     BSML::Register::RegisterMenuButton("Browser", "Show or hide the web browser", QuestBrowser::Window::ToggleVisible);
+    BSML::Register::RegisterMenuButton("Bring browser here", "Recover the browser in front of you", QuestBrowser::Window::BringHere);
 
     // Mod settings: show the browser during songs, and reset its positions.
     BSML::Register::RegisterSettingsMenu(
@@ -51,6 +52,7 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
                                    "In a song, pause to click or move it.",
                                    3.5f);
             BSML::Lite::CreateUIButton(container->transform, "Reset positions and sizes", QuestBrowser::Window::ResetPositions);
+            BSML::Lite::CreateUIButton(container->transform, "Bring browser here", QuestBrowser::Window::BringHere);
         },
         false);
 

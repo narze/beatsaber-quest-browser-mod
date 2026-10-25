@@ -16,6 +16,7 @@ bool IsReady();
 
 void SetActive(bool active);
 void SetFrameRate(int fps);
+void SetViewport(int width, int height);
 void LoadUrl(std::string_view url);
 void GoBack();
 void GoForward();

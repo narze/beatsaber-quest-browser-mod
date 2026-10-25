@@ -59,6 +59,9 @@ public final class BrowserBridge {
 
     private static int width;
     private static int height;
+    // The transport texture stays fixed; the WebView viewport follows the VR window.
+    private static int viewWidth;
+    private static int viewHeight;
     private static int frameIntervalMs = 33;
     private static volatile boolean active;
     private static volatile String currentUrl = "";
@@ -98,6 +101,8 @@ public final class BrowserBridge {
         synchronized (frameLock) {
             width = w;
             height = h;
+            viewWidth = w;
+            viewHeight = h;
             front = ByteBuffer.allocateDirect(w * h * 4);
             back = ByteBuffer.allocateDirect(w * h * 4);
             frameSeq = 0;
@@ -186,7 +191,7 @@ public final class BrowserBridge {
                 if (customView != null) exitFullscreen();
                 customView = view;
                 customViewCallback = callback;
-                container.addView(view, new FrameLayout.LayoutParams(width, height));
+                container.addView(view, new FrameLayout.LayoutParams(viewWidth, viewHeight));
                 layout();
                 view.requestFocus();
                 Log.i(TAG, "Fullscreen on");
@@ -277,14 +282,33 @@ public final class BrowserBridge {
     }
 
     private static void layout() {
-        int ws = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY);
-        int hs = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY);
+        int ws = View.MeasureSpec.makeMeasureSpec(viewWidth, View.MeasureSpec.EXACTLY);
+        int hs = View.MeasureSpec.makeMeasureSpec(viewHeight, View.MeasureSpec.EXACTLY);
         webView.measure(ws, hs);
-        webView.layout(0, 0, width, height);
+        webView.layout(0, 0, viewWidth, viewHeight);
         if (customView != null) {
             customView.measure(ws, hs);
-            customView.layout(0, 0, width, height);
+            customView.layout(0, 0, viewWidth, viewHeight);
         }
+    }
+
+    public static void setViewport(final int w, final int h) {
+        if (w < 1 || h < 1 || w > 4096 || h > 4096) return;
+        post(() -> {
+            viewWidth = w;
+            viewHeight = h;
+            if (container.getLayoutParams() != null) {
+                ViewGroup.LayoutParams params = container.getLayoutParams();
+                params.width = w;
+                params.height = h;
+                container.setLayoutParams(params);
+            }
+            webView.setLayoutParams(new FrameLayout.LayoutParams(w, h));
+            if (customView != null) customView.setLayoutParams(new FrameLayout.LayoutParams(w, h));
+            layout();
+            webView.invalidate();
+            Log.i(TAG, "Viewport " + w + "x" + h);
+        });
     }
 
     // ---- Fullscreen ------------------------------------------------------
@@ -442,20 +466,23 @@ public final class BrowserBridge {
     }
 
     private static void drawFrame() {
-        if (webView.getWidth() != width || webView.getHeight() != height
-                || (customView != null && (customView.getWidth() != width || customView.getHeight() != height))) {
+        if (webView.getWidth() != viewWidth || webView.getHeight() != viewHeight
+                || (customView != null && (customView.getWidth() != viewWidth || customView.getHeight() != viewHeight))) {
             layout();
         }
         if (hardwareRender) {
             try {
                 Canvas c = readerSurface.lockHardwareCanvas();
+                int save = c.save();
                 try {
                     c.drawColor(Color.WHITE);
+                    c.scale(width / (float) viewWidth, height / (float) viewHeight);
                     // WebView draws its scroll position as a canvas translation.
                     View v = target();
                     c.translate(-v.getScrollX(), -v.getScrollY());
                     v.draw(c);
                 } finally {
+                    c.restoreToCount(save);
                     readerSurface.unlockCanvasAndPost(c);
                 }
                 if (!loggedHardware) {
@@ -471,6 +498,7 @@ public final class BrowserBridge {
         bitmap.eraseColor(0xFFFFFFFF);
         // WebView draws its scroll position as a canvas translation.
         int save = canvas.save();
+        canvas.scale(width / (float) viewWidth, height / (float) viewHeight);
         View v = target();
         canvas.translate(-v.getScrollX(), -v.getScrollY());
         v.draw(canvas);
@@ -613,7 +641,8 @@ public final class BrowserBridge {
                     downTime = now;
                     if (!t.hasFocus()) t.requestFocus();
                 }
-                MotionEvent e = MotionEvent.obtain(downTime, now, action, x, y, 0);
+                MotionEvent e = MotionEvent.obtain(downTime, now, action,
+                        x * viewWidth / width, y * viewHeight / height, 0);
                 e.setSource(InputDevice.SOURCE_TOUCHSCREEN);
                 t.dispatchTouchEvent(e);
                 e.recycle();
@@ -733,8 +762,8 @@ public final class BrowserBridge {
                 props[0].id = 0;
                 props[0].toolType = MotionEvent.TOOL_TYPE_MOUSE;
                 MotionEvent.PointerCoords[] coords = {new MotionEvent.PointerCoords()};
-                coords[0].x = x;
-                coords[0].y = y;
+                coords[0].x = x * viewWidth / width;
+                coords[0].y = y * viewHeight / height;
                 coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, amount);
                 long now = SystemClock.uptimeMillis();
                 MotionEvent e = MotionEvent.obtain(now, now, MotionEvent.ACTION_SCROLL, 1, props, coords,

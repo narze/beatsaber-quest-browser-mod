@@ -14,8 +14,14 @@ void ToggleVisible();
 void Refresh();
 // Settings: move the window back to the default positions.
 void ResetPositions();
+void BringHere();
+void FitControls();
+float GetControlScale();
+float GetChromeHeight();
 // Called by SongScope when the game scene goes away.
 void OnSongEnded();
+void CycleAspectPreset();
+int GetAspectPreset();
 
 }  // namespace QuestBrowser::Window
 

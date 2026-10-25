@@ -25,6 +25,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, KeyboardPanel, UnityEngine::MonoBehaviour) {
 
     void SetVisible(bool visible);
     bool IsVisible();
+    void SetWindowHeight(float height) { windowHeight = height; FollowAnchor(); }
 
    private:
     struct KeyButton {

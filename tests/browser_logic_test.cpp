@@ -153,3 +153,16 @@ TEST_CASE("ScreenStateFor: 'show during songs' off hides it only in songs") {
     CHECK_FALSE(ScreenStateFor(Context::SongPlaying, true, false).visible);
     CHECK_FALSE(ScreenStateFor(Context::SongPaused, true, false).visible);
 }
+#include "history_logic.hpp"
+
+TEST_CASE("history revisits move to front and oldest visits are bounded") {
+    std::vector<std::string> urls;
+    for (int i = 0; i < 105; ++i) QuestBrowser::Logic::RememberUrl(urls, "http://server/" + std::to_string(i));
+    REQUIRE(urls.size() == 100);
+    CHECK(urls.back() == "http://server/5");
+    QuestBrowser::Logic::RememberUrl(urls, "http://server/50");
+    CHECK(urls.front() == "http://server/50");
+    CHECK(urls.size() == 100);
+    QuestBrowser::Logic::RememberUrl(urls, "");
+    CHECK(urls.size() == 100);
+}

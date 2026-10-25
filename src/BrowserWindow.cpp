@@ -22,14 +22,21 @@ namespace QuestBrowser::Window {
 namespace {
 
 // Fits the layout in BrowserScreen.cpp: 144 x 81 page, toolbar, title, padding.
-// At the default scale, about 1.8 m x 1.3 m; the corner grip changes the scale.
-constexpr Vector2 kScreenSize{150.0f, 106.0f};
+// At the default scale, about 1.8 m wide. Grips change dimensions, not scale.
+constexpr Vector2 kScreenSize{150.0f, 126.0f};
 
 Logic::Context context = Logic::Context::Menu;
 std::optional<Logic::PoseSlot> placedFor;
 SafePtrUnity<BSML::FloatingScreen> floatingScreen;
 SafePtrUnity<BrowserScreen> browserScreen;
-SafePtrUnity<ResizeGrip> resizeGrip;
+std::vector<SafePtrUnity<ResizeGrip>> resizeGrips;
+
+void ApplyDimensions(Resize::Dimensions size, bool save) {
+    if (!floatingScreen) return;
+    floatingScreen->set_ScreenSize({size.width, size.height});
+    if (browserScreen) browserScreen->SetDimensions(size);
+    if (save && placedFor) Config::SetDimensions(*placedFor, size);
+}
 
 void OnHandleReleased(BSML::FloatingScreen*, BSML::FloatingScreenHandleEventArgs const& args) {
     if (!placedFor) return;
@@ -51,12 +58,14 @@ void EnsureCreated() {
     floatingScreen = screen;
     placedFor.reset();
     browserScreen = BrowserScreen::CreateIn(screen->transform);
-    resizeGrip = ResizeGrip::Create(screen->transform, [](float scale) {
-        if (!placedFor) return;
-        auto pose = Config::GetPose(*placedFor);
-        pose.scale = scale;
-        Config::SetPose(*placedFor, pose);
-    });
+    for (auto axes : {Vector2(1, -1), Vector2(-1, -1), Vector2(1, 1), Vector2(-1, 1),
+                      Vector2(-1, 0), Vector2(1, 0), Vector2(0, 1), Vector2(0, -1)})
+        resizeGrips.emplace_back(ResizeGrip::Create(screen->transform, static_cast<int>(axes.x), static_cast<int>(axes.y), ApplyDimensions));
+    resizeGrips.emplace_back(ResizeGrip::CreateDepth(screen->transform, []() {
+        if (!placedFor || !floatingScreen) return;
+        auto t = floatingScreen->transform;
+        Config::SetPose(*placedFor, {t->position, t->rotation, t->localScale.x});
+    }));
     logger.info("Created browser window");
 }
 
@@ -84,10 +93,11 @@ void Apply() {
         floatingScreen->transform->SetPositionAndRotation(pose.position, pose.rotation);
         floatingScreen->transform->localScale = Vector3(pose.scale, pose.scale, pose.scale);
         placedFor = state.pose;
+        ApplyDimensions(Config::GetDimensions(state.pose), false);
     }
     floatingScreen->gameObject->SetActive(true);
     floatingScreen->set_ShowHandle(state.showHandle);
-    if (resizeGrip) resizeGrip->gameObject->SetActive(state.showHandle);
+    for (auto& grip : resizeGrips) if (grip) grip->gameObject->SetActive(state.showHandle);
     if (browserScreen) browserScreen->SetInteractive(state.interactive);
 }
 
@@ -104,6 +114,47 @@ void ToggleVisible() {
 }
 
 void Refresh() { Apply(); }
+
+float GetControlScale() { return browserScreen ? browserScreen->GetControlScale() : 1.0f; }
+float GetChromeHeight() { return browserScreen ? browserScreen->GetChromeHeight() : Resize::kChromeHeight; }
+void FitControls() {
+    if (!floatingScreen || !browserScreen) return;
+    auto rect = floatingScreen->GetComponent<RectTransform*>()->rect;
+    ApplyDimensions(Resize::DimensionsFromDrag({rect.width, rect.height}, 0, 0, 0, 0,
+                    Resize::AspectFor(GetAspectPreset()), GetControlScale(), GetChromeHeight()), false);
+}
+
+void BringHere() {
+    auto camera = Camera::get_main();
+    if (!camera) return;
+    Config::SetVisible(true);
+    Apply();
+    if (!floatingScreen || !placedFor) return;
+    auto head = camera->transform;
+    auto forward = head->forward;
+    auto position = head->position;
+    Config::Pose pose{{position.x + forward.x * 2.5f, position.y + forward.y * 2.5f,
+                       position.z + forward.z * 2.5f},
+                      Quaternion::LookRotation(forward, head->up), Config::kDefaultScale};
+    floatingScreen->transform->SetPositionAndRotation(pose.position, pose.rotation);
+    floatingScreen->transform->localScale = {pose.scale, pose.scale, pose.scale};
+    Config::SetPose(*placedFor, pose);
+    Config::SetAspectPreset(*placedFor, 0);
+    if (browserScreen) browserScreen->RefreshForPose();
+    ApplyDimensions({}, false);
+    FitControls();
+    auto rect = floatingScreen->GetComponent<RectTransform*>()->rect;
+    Config::SetDimensions(*placedFor, {rect.width, rect.height});
+}
+
+int GetAspectPreset() { return placedFor ? Config::GetAspectPreset(*placedFor) : 0; }
+void CycleAspectPreset() {
+    if (!placedFor) return;
+    int preset = (GetAspectPreset() + 1) % 4;
+    Config::SetAspectPreset(*placedFor, preset);
+    auto size = Config::GetDimensions(*placedFor);
+    ApplyDimensions(Resize::DimensionsFromDrag(size, 0, 0, 1, 0, Resize::AspectFor(preset), GetControlScale(), GetChromeHeight()), true);
+}
 
 void OnSongEnded() { SetContext(Logic::Context::Menu); }
 

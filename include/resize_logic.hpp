@@ -9,6 +9,35 @@
 
 namespace QuestBrowser::Resize {
 
+struct Dimensions { float width = 150, height = 126; };
+constexpr float kChromeHeight = 45;
+constexpr float kPaddingWidth = 6;
+inline float AspectFor(int preset) {
+    return preset == 1 ? 16.0f / 9.0f : preset == 2 ? 4.0f / 3.0f : preset == 3 ? 9.0f / 16.0f : 0.0f;
+}
+
+// The window stays centered. Each dragged edge moves by the pointer delta.
+// Grow physical controls with distance, accounting for the window's world scale.
+inline float ControlScale(float distance, float worldScale) {
+    return std::max(1.0f, distance * 0.012f / (2.5f * std::max(worldScale, 0.0001f)));
+}
+
+inline Dimensions DimensionsFromDrag(Dimensions start, float dx, float dy, int axisX, int axisY, float aspect,
+                                     float controls = 1, float chrome = kChromeHeight) {
+    float minWidth = kPaddingWidth + 144 * controls;
+    float minHeight = std::max(126.0f, chrome + 81);
+    float w = std::max(start.width + 2 * dx * axisX, minWidth);
+    float h = std::max(start.height + 2 * dy * axisY, minHeight);
+    if (aspect > 0) {
+        float pageW = axisX ? w - kPaddingWidth : (h - chrome) * aspect;
+        float minW = std::max(minWidth - kPaddingWidth, (minHeight - chrome) * aspect);
+        pageW = std::max(pageW, minW);
+        w = pageW + kPaddingWidth;
+        h = pageW / aspect + chrome;
+    }
+    return {w, h};
+}
+
 struct Vec3 {
     float x, y, z;
 };
@@ -16,6 +45,11 @@ struct Vec3 {
 inline Vec3 Sub(Vec3 a, Vec3 b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
 inline float Dot(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 inline float Length(Vec3 a) { return std::sqrt(Dot(a, a)); }
+
+// Controller motion sideways/upwards does not affect depth. Axis must be normalized.
+inline float DepthFromDrag(float startDistance, Vec3 controllerDelta, Vec3 axis) {
+    return std::clamp(startDistance + Dot(controllerDelta, axis), 0.6f, 8.0f);
+}
 
 // Where the ray (origin, direction) meets the plane (point, normal).
 // nullopt when the ray is parallel to the plane or the plane is behind the ray.

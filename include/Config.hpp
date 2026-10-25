@@ -3,6 +3,8 @@
 #include "UnityEngine/Quaternion.hpp"
 #include "UnityEngine/Vector3.hpp"
 #include "browser_logic.hpp"
+#include "history_logic.hpp"
+#include "resize_logic.hpp"
 
 // Settings saved in /sdcard/ModData/com.beatgames.beatsaber/Configs/QuestBrowser.json
 namespace QuestBrowser::Config {
@@ -29,5 +31,15 @@ void SetShowInSong(bool value);
 Pose GetPose(Logic::PoseSlot slot);
 void SetPose(Logic::PoseSlot slot, Pose const& pose);
 void ResetPoses();
+Resize::Dimensions GetDimensions(Logic::PoseSlot slot);
+void SetDimensions(Logic::PoseSlot slot, Resize::Dimensions size);
+int GetAspectPreset(Logic::PoseSlot slot);
+void SetAspectPreset(Logic::PoseSlot slot, int preset);
+float GetZoom();
+void SetZoom(float zoom);
+float GetOpacity();
+void SetOpacity(float value);
+std::vector<std::string> GetHistory();
+void SetHistory(std::vector<std::string> const& urls);
 
 }  // namespace QuestBrowser::Config

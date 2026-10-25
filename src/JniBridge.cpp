@@ -29,6 +29,7 @@ struct Methods {
     jclass cls = nullptr;
     jmethodID init, setActive, setFrameRate, loadUrl, goBack, goForward, reload;
     jmethodID touch, scroll;
+    jmethodID setViewport;
     jmethodID sendText, sendKey, beginUrlEditing, cancelUrlEditing, takeKeyboardRequest, getUrlDraft, takeSubmittedUrl;
     jmethodID getUrl, getTitle, getProgress;
     jmethodID acquireFrame, releaseFrame;
@@ -145,6 +146,7 @@ bool LookupMethods(JNIEnv* env) {
     return get(m.init, "init", "(Ljava/lang/Object;IILjava/lang/String;)V") &&
            get(m.setActive, "setActive", "(Z)V") &&
            get(m.setFrameRate, "setFrameRate", "(I)V") &&
+           get(m.setViewport, "setViewport", "(II)V") &&
            get(m.loadUrl, "loadUrl", "(Ljava/lang/String;)V") &&
            get(m.goBack, "goBack", "()V") &&
            get(m.goForward, "goForward", "()V") &&
@@ -235,6 +237,7 @@ bool IsReady() { return ready; }
 
 void SetActive(bool active) { CallVoid("setActive", m.setActive, static_cast<jboolean>(active)); }
 void SetFrameRate(int fps) { CallVoid("setFrameRate", m.setFrameRate, static_cast<jint>(fps)); }
+void SetViewport(int width, int height) { CallVoid("setViewport", m.setViewport, static_cast<jint>(width), static_cast<jint>(height)); }
 void LoadUrl(std::string_view url) { CallWithString("loadUrl", m.loadUrl, url); }
 void GoBack() { CallVoid("goBack", m.goBack); }
 void GoForward() { CallVoid("goForward", m.goForward); }

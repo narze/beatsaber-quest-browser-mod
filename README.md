@@ -9,14 +9,23 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 1. Install `QuestBrowser.qmod` with [ModsBeforeFriday](https://mbf.bsquest.xyz/) or QuestPatcher. It installs BSML, custom-types, and beatsaber-hook too if they are missing.
 2. The browser is one floating window. It stays open in the menu and in songs, and the page does not reload between them.
    - **Browser** in the mods list on the left of the main menu shows or hides it.
-   - Menu: click the page, drag the handle below the window to move it, and drag the grip in its bottom-right corner to resize it.
+   - **Bring browser here** in the main menu mods list or Browser settings recovers a lost window 2.5 m in front of your current view, restores a readable size, and shows it without reloading the page. Only the current menu/song layout is reset.
+   - Menu: click the page, drag the handle below the window to move it, and drag a corner or edge grip to resize it. Edge grips change one dimension; corner grips change both independently in Free mode. Resizing stays centered on the window.
+   - Resize grips are small translucent cubes. Hold the **Depth** handle near the bottom-right corner and push/pull your controller to move the window farther away/closer (0.6–8 m from your starting head position). Release to save its position separately for menus and songs.
    - Song: the page shows, but you can not click it. Pause to click, move, or resize it.
    - The menu and songs each keep their own window position and size.
 3. Controls:
+   - Back, Forward, URL, and **Menu** stay visible. **Menu > Browse** contains Reload, Home, Keyboard, and History. **Menu > View** contains aspect, zoom, and opacity controls (**Fade - / +**). Close Menu to give the page more room.
+   - Buttons and labels grow with distance. The minimum window size fits the controls; there is no maximum window width or height.
    - Point at the page and pull the trigger to click. Hold the trigger and move to drag.
    - Move the thumbstick up or down to scroll the page under the pointer.
    - **URL** opens the keyboard to type an address. The title line shows what you type. Enter loads it. Type an address (`example.com`) or a search (`beat saber mods`).
    - Tap a text field on the page to open the keyboard, or press **Keyboard**. **Hide** closes it.
+   - Clicking outside both the browser window and keyboard also closes the keyboard.
+   - **History** opens up to 100 recent URLs, newest first. Click a URL to revisit it, **Delete** to remove one, or **Clear all** to erase the list. **Newer** and **Older** switch pages. History stays saved across restarts; recording starts with this version.
+   - **Opacity - / +** adjusts the window from 20% to 100% in 10% steps. The setting stays saved across restarts.
+   - **Aspect** cycles Free, 16:9, 4:3, and Portrait (9:16). Presets constrain the page area, excluding the toolbar; select Free to unlock the ratio again. Width, height, and preset save separately for menus and songs.
+   - **Zoom - / +** adjusts page zoom from 50% to 200%, without changing the window. Pages reflow to the new viewport. The keyboard follows the resized window. Minimum dimensions keep the toolbar and history usable.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
    - **<**, **>**, **Reload**, **Home** work like in a desktop browser.
    - Fullscreen video fills the browser window. **<** or **Esc** leaves fullscreen.

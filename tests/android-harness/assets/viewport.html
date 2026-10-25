@@ -1,0 +1,15 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body { margin:0; width:100%; height:100%; background:white; }
+button { position:absolute; left:20%; top:20%; width:10%; height:10%; }
+</style>
+<button onclick="clicks++;report()">Click</button>
+<script>
+let clicks=0;
+function report() {
+ document.title=(innerWidth>innerHeight?'wide':'portrait')+' clicks='+clicks;
+}
+addEventListener('resize',report);
+report();
+</script>

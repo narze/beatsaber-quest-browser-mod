@@ -98,6 +98,49 @@ void SetPose(Logic::PoseSlot slot, Pose const& pose) {
 void ResetPoses() {
     SetPose(Logic::PoseSlot::Menu, kDefaultMenuPose);
     SetPose(Logic::PoseSlot::Song, kDefaultSongPose);
+    SetDimensions(Logic::PoseSlot::Menu, {});
+    SetDimensions(Logic::PoseSlot::Song, {});
+    SetAspectPreset(Logic::PoseSlot::Menu, 0);
+    SetAspectPreset(Logic::PoseSlot::Song, 0);
+}
+
+Resize::Dimensions GetDimensions(Logic::PoseSlot slot) {
+    return Resize::DimensionsFromDrag({GetFloat(Key(slot, "width"), 150), GetFloat(Key(slot, "height"), 126)}, 0, 0, 0, 0, 0);
+}
+void SetDimensions(Logic::PoseSlot slot, Resize::Dimensions size) {
+    SetFloat(Key(slot, "width"), size.width);
+    SetFloat(Key(slot, "height"), size.height);
+    Get().Write();
+}
+int GetAspectPreset(Logic::PoseSlot slot) { return static_cast<int>(std::clamp(GetFloat(Key(slot, "aspect"), 0), 0.0f, 3.0f)); }
+void SetAspectPreset(Logic::PoseSlot slot, int preset) { SetFloat(Key(slot, "aspect"), preset); Get().Write(); }
+float GetZoom() { return std::clamp(GetFloat("zoom", 1), 0.5f, 2.0f); }
+void SetZoom(float zoom) { SetFloat("zoom", std::clamp(zoom, 0.5f, 2.0f)); Get().Write(); }
+
+float GetOpacity() { return std::clamp(GetFloat("opacity", 1.0f), 0.2f, 1.0f); }
+void SetOpacity(float value) {
+    SetFloat("opacity", std::clamp(value, 0.2f, 1.0f));
+    Get().Write();
+}
+
+std::vector<std::string> GetHistory() {
+    std::vector<std::string> urls;
+    auto it = Doc().FindMember("history");
+    if (it != Doc().MemberEnd() && it->value.IsArray()) {
+        for (auto const& entry : it->value.GetArray()) {
+            if (entry.IsString() && urls.size() < 100) urls.emplace_back(entry.GetString(), entry.GetStringLength());
+        }
+    }
+    return urls;
+}
+
+void SetHistory(std::vector<std::string> const& urls) {
+    rapidjson::Value entries(rapidjson::kArrayType);
+    for (auto const& url : urls) entries.PushBack(rapidjson::Value(url.c_str(), Alloc()), Alloc());
+    auto it = Doc().FindMember("history");
+    if (it == Doc().MemberEnd()) Doc().AddMember(rapidjson::Value("history", Alloc()), entries, Alloc());
+    else it->value = entries;
+    Get().Write();
 }
 
 }  // namespace QuestBrowser::Config

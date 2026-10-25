@@ -46,6 +46,28 @@ public class HarnessActivity extends Activity {
             return;
         }
 
+        if ("viewport".equals(getIntent().getStringExtra("mode"))) {
+            call("loadUrl", new Class<?>[] {String.class}, "file:///android_asset/viewport.html");
+            whenTitle("wide clicks=0", () -> {
+                call("setViewport", new Class<?>[] {int.class, int.class}, 720, 1280);
+                whenTitle("portrait clicks=0", () -> {
+                    tap(W * 0.25f, H * 0.25f);
+                    whenTitle("portrait clicks=1", () -> {
+                        Log.i(TAG, "VIEWPORT_PORTRAIT_CLICK_OK");
+                        call("setViewport", new Class<?>[] {int.class, int.class}, 1600, 800);
+                        whenTitle("wide clicks=1", () -> {
+                            tap(W * 0.25f, H * 0.25f);
+                            whenTitle("wide clicks=2", () -> {
+                                Log.i(TAG, "VIEWPORT_WIDE_CLICK_OK");
+                                saveFrame("viewport.png");
+                                Log.i(TAG, "VIEWPORT_DONE");
+                            });
+                        });
+                    });
+                });
+            });
+            return;
+        }
         if ("keyboard".equals(getIntent().getStringExtra("mode"))) {
             runKeyboardTest();
             return;
