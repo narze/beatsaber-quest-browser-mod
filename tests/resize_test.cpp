@@ -50,14 +50,14 @@ TEST_CASE("Edge resizing changes only its axis and enforces usable bounds") {
     CHECK(height.height == doctest::Approx(190));
     auto minimum = DimensionsFromDrag({180, 160}, -999, 999, 1, -1, 0);
     CHECK(minimum.width == 150);
-    CHECK(minimum.height == 126);
+    CHECK(minimum.height == 87);  // page-only window: 81 of page plus 6 of padding
 }
 
 TEST_CASE("Aspect presets constrain the page area rather than toolbar area") {
     auto wide = DimensionsFromDrag({150, 126}, 30, 0, 1, 0, 16.0f / 9.0f);
-    CHECK((wide.width - 6) / (wide.height - 45) == doctest::Approx(16.0f / 9.0f));
+    CHECK((wide.width - 6) / (wide.height - kChromeHeight) == doctest::Approx(16.0f / 9.0f));
     auto portrait = DimensionsFromDrag({150, 301}, 0, 20, 0, -1, 9.0f / 16.0f);
-    CHECK((portrait.width - 6) / (portrait.height - 45) == doctest::Approx(9.0f / 16.0f));
+    CHECK((portrait.width - 6) / (portrait.height - kChromeHeight) == doctest::Approx(9.0f / 16.0f));
 }
 
 TEST_CASE("RayPlaneHit finds where a ray meets a plane") {
@@ -114,9 +114,14 @@ TEST_CASE("DepthFromDrag: the gain makes the window move faster than the hand") 
     CHECK(DepthFromDrag(3, {0, 0, 5}, {0, 0, 1}, kDepthGain) == doctest::Approx(8));
 }
 
-TEST_CASE("PlayModeHeight: only the page and its padding, the page keeps its size") {
-    // 126 tall window with 45 of controls: page 81, plus 6 of padding.
-    CHECK(PlayModeHeight({150, 126}, 45) == doctest::Approx(87));
-    // A taller window keeps its taller page.
-    CHECK(PlayModeHeight({150, 300}, 45) == doctest::Approx(261));
+TEST_CASE("The window is only the page: chrome is the padding, the default page is 16:9") {
+    CHECK(kChromeHeight == doctest::Approx(6));
+    Dimensions d;
+    CHECK((d.width - kPaddingWidth) / (d.height - kChromeHeight) == doctest::Approx(16.0f / 9.0f));
+}
+
+TEST_CASE("MigrateHeight removes the old in-window toolbar from saved heights") {
+    CHECK(MigrateHeight(126) == doctest::Approx(92));  // old default: 34 of toolbar rows
+    CHECK(MigrateHeight(300) == doctest::Approx(266));
+    CHECK(MigrateHeight(100) == doctest::Approx(87));  // never below the minimum
 }

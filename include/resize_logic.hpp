@@ -9,8 +9,10 @@
 
 namespace QuestBrowser::Resize {
 
-struct Dimensions { float width = 150, height = 126; };
-constexpr float kChromeHeight = 45;
+// The window is only the page; the toolbar floats below it. Chrome is the padding.
+// Default page: 144 x 81 (16:9).
+struct Dimensions { float width = 150, height = 87; };
+constexpr float kChromeHeight = 6;
 constexpr float kPaddingWidth = 6;
 inline float AspectFor(int preset) {
     return preset == 1 ? 16.0f / 9.0f : preset == 2 ? 4.0f / 3.0f : preset == 3 ? 9.0f / 16.0f : 0.0f;
@@ -22,16 +24,14 @@ inline float ControlScale(float distance, float worldScale) {
     return std::max(1.0f, distance * 0.012f / (2.5f * std::max(worldScale, 0.0001f)));
 }
 
-// Window height while a song plays: the controls are hidden, so only the page and
-// its padding remain. The page keeps the size it has with the controls shown.
-inline float PlayModeHeight(Dimensions size, float chrome) {
-    return std::max(81.0f, size.height - chrome) + kPaddingWidth;
-}
+// Saved heights from before the redesign include the old in-window toolbar rows
+// (34 units at the default size); the page keeps its size without them.
+inline float MigrateHeight(float height) { return std::max(81.0f + kChromeHeight, height - 34.0f); }
 
 inline Dimensions DimensionsFromDrag(Dimensions start, float dx, float dy, int axisX, int axisY, float aspect,
                                      float controls = 1, float chrome = kChromeHeight) {
     float minWidth = kPaddingWidth + 144 * controls;
-    float minHeight = std::max(126.0f, chrome + 81);
+    float minHeight = chrome + 81;
     float w = std::max(start.width + 2 * dx * axisX, minWidth);
     float h = std::max(start.height + 2 * dy * axisY, minHeight);
     if (aspect > 0) {
