@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <string>
+
 #include "keybind_logic.hpp"
 
 using namespace QuestBrowser::Keybind;
