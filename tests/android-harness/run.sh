@@ -136,6 +136,20 @@ waitlog "HTTP_DONE" || true
 adb logcat -d -s QBHarness:* QuestBrowser:* | tee "$OUT/logcat-http.txt" | grep -E "HTTP_|leartext"
 grep -q "HTTP_TITLE http ok" "$OUT/logcat-http.txt" || { echo "FAIL: plain HTTP page did not load"; http=1; }
 
+echo "== Tabs test"
+adb logcat -c
+adb shell am force-stop "$PKG"
+adb shell am start -n "$PKG/.HarnessActivity" --es mode tabs >/dev/null
+tabs=0
+waitlog "TABS_DONE" || { echo "FAIL: tabs test did not finish"; tabs=1; }
+adb logcat -d -s QBHarness:* QuestBrowser:* | tee "$OUT/logcat-tabs.txt" | grep -E "TABS_"
+for want in "TABS_RESTORED count=2 active=1 titles=|tab two" \
+            "TABS_NEW count=3 active=2 titles=|tab two|ready" \
+            "TABS_SELECTED count=3 active=1" \
+            "TABS_CLOSED count=2 active=1 titles=|ready"; do
+    grep -qF "$want" "$OUT/logcat-tabs.txt" || { echo "FAIL: expected '$want'"; tabs=1; }
+done
+
 echo "== Check"
 fail=0
 grep -q "FAIL" "$OUT/logcat.txt" && { echo "FAIL: harness reported a failure"; fail=1; }
@@ -148,5 +162,6 @@ echo "Frames: $OUT/frame1.png $OUT/frame2.png"
 [ $fs -eq 0 ] || fail=1
 [ $http -eq 0 ] || fail=1
 [ $vp -eq 0 ] || fail=1
+[ $tabs -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "PASS"
 exit $fail

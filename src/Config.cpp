@@ -144,6 +144,37 @@ void SetOpacity(float value) {
     Get().Write();
 }
 
+namespace {
+
+std::vector<std::string> GetStrings(char const* key, std::size_t limit) {
+    std::vector<std::string> out;
+    auto it = Doc().FindMember(key);
+    if (it != Doc().MemberEnd() && it->value.IsArray()) {
+        for (auto const& entry : it->value.GetArray()) {
+            if (entry.IsString() && out.size() < limit) out.emplace_back(entry.GetString(), entry.GetStringLength());
+        }
+    }
+    return out;
+}
+
+void SetStrings(char const* key, std::vector<std::string> const& values) {
+    rapidjson::Value entries(rapidjson::kArrayType);
+    for (auto const& v : values) entries.PushBack(rapidjson::Value(v.c_str(), Alloc()), Alloc());
+    auto it = Doc().FindMember(key);
+    if (it == Doc().MemberEnd()) Doc().AddMember(rapidjson::Value(key, Alloc()), entries, Alloc());
+    else it->value = entries;
+}
+
+}  // namespace
+
+std::vector<std::string> GetTabs() { return GetStrings("tabs", 64); }
+int GetActiveTab() { return static_cast<int>(GetFloat("activeTab", 0)); }
+void SetTabs(std::vector<std::string> const& urls, int active) {
+    SetStrings("tabs", urls);
+    SetFloat("activeTab", static_cast<float>(active));
+    Get().Write();
+}
+
 std::vector<std::string> GetHistory() {
     std::vector<std::string> urls;
     auto it = Doc().FindMember("history");

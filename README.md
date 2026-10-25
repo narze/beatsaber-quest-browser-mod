@@ -28,10 +28,12 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - **Zoom - / +** adjusts page zoom from 50% to 200%, without changing the window. Pages reflow to the new viewport. The keyboard follows the resized window. Minimum dimensions keep the toolbar and history usable.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
    - **<**, **>**, **Reload**, **Home** work like in a desktop browser.
+   - **Tabs:** the row under the toolbar shows up to 4 tabs; the open tab is blue. **+** opens a new tab and the keyboard, **x** closes the open tab (the last tab goes back to the home page). Up to 10 tabs; with more than 4, the row scrolls with the open tab, and `<` / `>` mark tabs past the edges. Background tabs are paused (a video there stops).
+   - Tabs come back at the next start. Only the open tab loads; the others load when you open them.
    - Fullscreen video fills the browser window. **<** or **Esc** leaves fullscreen.
 4. Browser settings: show the browser, show it during songs, the reset keybind (Off, X + Y, A + B, X + A, Y + B, left, right, or both stick clicks), and **Reset menu position** / **Reset in-song position**. A reset puts that window back at its default size, centered and raised above the song selection.
 
-The page stops (timers, video, audio) while the window is hidden. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
+The page stops (timers, video, audio) while the window is hidden. While a song plays, only the page shows; pause to see the controls. The move handle is above the window. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
 
 ## How it works
 

@@ -28,6 +28,7 @@ constexpr char const* kBridgeClass = "com.narze.questbrowser.BrowserBridge";
 struct Methods {
     jclass cls = nullptr;
     jmethodID init, setActive, setFrameRate, loadUrl, goBack, goForward, reload;
+    jmethodID newTab, selectTab, closeTab, getTabsVersion, getTabUrls, getTabTitles, getActiveTab;
     jmethodID touch, scroll;
     jmethodID setViewport;
     jmethodID sendText, sendKey, beginUrlEditing, cancelUrlEditing, takeKeyboardRequest, getUrlDraft, takeSubmittedUrl;
@@ -143,7 +144,14 @@ bool LookupMethods(JNIEnv* env) {
         out = env->GetStaticMethodID(m.cls, name, sig);
         return !CheckException(env, name) && out;
     };
-    return get(m.init, "init", "(Ljava/lang/Object;IILjava/lang/String;)V") &&
+    return get(m.init, "init", "(Ljava/lang/Object;II[Ljava/lang/String;I)V") &&
+           get(m.newTab, "newTab", "(Ljava/lang/String;)V") &&
+           get(m.selectTab, "selectTab", "(I)V") &&
+           get(m.closeTab, "closeTab", "(II)V") &&
+           get(m.getTabsVersion, "getTabsVersion", "()I") &&
+           get(m.getTabUrls, "getTabUrls", "()[Ljava/lang/String;") &&
+           get(m.getTabTitles, "getTabTitles", "()[Ljava/lang/String;") &&
+           get(m.getActiveTab, "getActiveTab", "()I") &&
            get(m.setActive, "setActive", "(Z)V") &&
            get(m.setFrameRate, "setFrameRate", "(I)V") &&
            get(m.setViewport, "setViewport", "(II)V") &&
@@ -199,7 +207,32 @@ std::string CallString(char const* where, jmethodID method) { return CallOptiona
 
 }  // namespace
 
-bool Init(int width, int height, std::string_view startUrl) {
+namespace {
+
+std::vector<std::string> CallStringArray(char const* where, jmethodID method) {
+    std::vector<std::string> out;
+    if (!ready) return out;
+    JNIEnv* env = GetEnv();
+    if (!env) return out;
+    auto array = static_cast<jobjectArray>(env->CallStaticObjectMethod(m.cls, method));
+    if (CheckException(env, where) || !array) return out;
+    jsize n = env->GetArrayLength(array);
+    for (jsize i = 0; i < n; i++) out.push_back(ToStdString(env, static_cast<jstring>(env->GetObjectArrayElement(array, i))));
+    env->DeleteLocalRef(array);
+    return out;
+}
+
+int CallInt(char const* where, jmethodID method) {
+    if (!ready) return 0;
+    JNIEnv* env = GetEnv();
+    if (!env) return 0;
+    jint v = env->CallStaticIntMethod(m.cls, method);
+    return CheckException(env, where) ? 0 : v;
+}
+
+}  // namespace
+
+bool Init(int width, int height, std::vector<std::string> const& tabUrls, int activeTab) {
     if (ready) return true;
     JNIEnv* env = GetEnv();
     if (!env) {
@@ -222,9 +255,16 @@ bool Init(int width, int height, std::string_view startUrl) {
         return false;
     }
 
-    jstring url = env->NewStringUTF(std::string(startUrl).c_str());
-    env->CallStaticVoidMethod(m.cls, m.init, activity, width, height, url);
-    env->DeleteLocalRef(url);
+    jclass stringCls = env->FindClass("java/lang/String");
+    jobjectArray urls = env->NewObjectArray(static_cast<jsize>(tabUrls.size()), stringCls, nullptr);
+    for (jsize i = 0; i < static_cast<jsize>(tabUrls.size()); i++) {
+        jstring url = env->NewStringUTF(tabUrls[i].c_str());
+        env->SetObjectArrayElement(urls, i, url);
+        env->DeleteLocalRef(url);
+    }
+    env->CallStaticVoidMethod(m.cls, m.init, activity, width, height, urls, static_cast<jint>(activeTab));
+    env->DeleteLocalRef(urls);
+    env->DeleteLocalRef(stringCls);
     if (activity) env->DeleteLocalRef(activity);
     if (CheckException(env, "BrowserBridge.init")) return false;
 
@@ -266,6 +306,16 @@ bool TakeKeyboardRequest() {
     jboolean requested = env->CallStaticBooleanMethod(m.cls, m.takeKeyboardRequest);
     return !CheckException(env, "takeKeyboardRequest") && requested;
 }
+void NewTab(std::string_view url) { CallWithString("newTab", m.newTab, url); }
+void SelectTab(int index) { CallVoid("selectTab", m.selectTab, static_cast<jint>(index)); }
+void CloseTab(int index, int newActive) {
+    CallVoid("closeTab", m.closeTab, static_cast<jint>(index), static_cast<jint>(newActive));
+}
+int GetTabsVersion() { return CallInt("getTabsVersion", m.getTabsVersion); }
+std::vector<std::string> GetTabUrls() { return CallStringArray("getTabUrls", m.getTabUrls); }
+std::vector<std::string> GetTabTitles() { return CallStringArray("getTabTitles", m.getTabTitles); }
+int GetActiveTab() { return CallInt("getActiveTab", m.getActiveTab); }
+
 std::optional<std::string> GetUrlDraft() { return CallOptionalString("getUrlDraft", m.getUrlDraft); }
 std::optional<std::string> TakeSubmittedUrl() { return CallOptionalString("takeSubmittedUrl", m.takeSubmittedUrl); }
 

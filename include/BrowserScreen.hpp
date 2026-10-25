@@ -11,7 +11,9 @@
 #include "UnityEngine/UI/LayoutElement.hpp"
 #include "VRUIControls/VRPointer.hpp"
 #include "KeyboardPanel.hpp"
+#include "UnityEngine/UI/Button.hpp"
 #include "browser_logic.hpp"
+#include "tabs_logic.hpp"
 #include "resize_logic.hpp"
 #include "custom-types/shared/macros.hpp"
 
@@ -27,6 +29,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::CanvasGroup>, canvasGroup);
     DECLARE_INSTANCE_FIELD(UnityW<KeyboardPanel>, keyboard);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, mainControls);
+    DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, tabControls);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, groupControls);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, browseControls);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::HorizontalLayoutGroup>, viewControls);
@@ -49,6 +52,12 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_METHOD(void, OnZoomDown);
     DECLARE_INSTANCE_METHOD(void, OnZoomUp);
     DECLARE_INSTANCE_METHOD(void, OnMenu);
+    DECLARE_INSTANCE_METHOD(void, OnTab0);
+    DECLARE_INSTANCE_METHOD(void, OnTab1);
+    DECLARE_INSTANCE_METHOD(void, OnTab2);
+    DECLARE_INSTANCE_METHOD(void, OnTab3);
+    DECLARE_INSTANCE_METHOD(void, OnNewTab);
+    DECLARE_INSTANCE_METHOD(void, OnCloseTab);
     DECLARE_INSTANCE_METHOD(void, OnBrowseGroup);
     DECLARE_INSTANCE_METHOD(void, OnViewGroup);
 
@@ -105,6 +114,19 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     UnityW<TMPro::TextMeshProUGUI> historyStatus;
     std::size_t historyPage = 0;
     std::string lastHistoryUrl;
+
+    // Tab strip: the first kStripSlots children of tabControls are tab buttons.
+    void UpdateTabs();
+    void RefreshTabStrip();
+    void OnTabSlot(int slot);
+    int tabsVersion = -1;
+    std::vector<std::string> tabUrls;
+    std::vector<std::string> tabTitles;
+    int activeTab = 0;
+    Tabs::Range stripRange{0, 0};
+    std::vector<UnityW<UnityEngine::UI::Button>> tabButtons;
+    std::vector<UnityW<TMPro::TextMeshProUGUI>> tabLabels;
+    UnityW<UnityEngine::UI::Button> newTabButton;
 
     bool ready = false;
     bool interactive = true;

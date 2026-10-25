@@ -45,6 +45,10 @@ float GetZoom();
 void SetZoom(float zoom);
 float GetOpacity();
 void SetOpacity(float value);
+// Open tabs, restored at the next start.
+std::vector<std::string> GetTabs();
+int GetActiveTab();
+void SetTabs(std::vector<std::string> const& urls, int active);
 std::vector<std::string> GetHistory();
 void SetHistory(std::vector<std::string> const& urls);
 

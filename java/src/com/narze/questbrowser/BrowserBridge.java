@@ -37,6 +37,7 @@ import android.widget.FrameLayout;
 import org.json.JSONObject;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
 /**
  * Off-screen WebView that the native mod drives through JNI.
@@ -68,8 +69,34 @@ public final class BrowserBridge {
     private static volatile String currentTitle = "";
     private static volatile int progress = 100;
 
+    // The WebView of the active tab. Only this one is in the container, drawn, and gets input.
     private static WebView webView;
     private static FrameLayout container;
+    private static Context viewContext;
+
+    // ---- Tabs ------------------------------------------------------------
+    // Each tab gets its WebView when it is first opened, so restored tabs do not all
+    // load at start. Background tabs are paused. The native side reads the snapshots
+    // below (written on the main thread) and decides which tab to open or close.
+
+    private static final int MAX_TABS = 10;
+
+    private static final class Tab {
+        String url;
+        String title = "";
+        WebView view;
+
+        Tab(String url) {
+            this.url = url;
+        }
+    }
+
+    private static final ArrayList<Tab> tabs = new ArrayList<>();
+    private static int activeTab;
+    private static volatile String[] tabUrls = new String[0];
+    private static volatile String[] tabTitles = new String[0];
+    private static volatile int activeTabIndex;
+    private static volatile int tabsVersion;
     private static Bitmap bitmap;
     private static Canvas canvas;
 
@@ -96,8 +123,11 @@ public final class BrowserBridge {
 
     // ---- Lifecycle -------------------------------------------------------
 
-    /** Creates the WebView. host is an Activity or other Context, or null. */
-    public static void init(final Object host, final int w, final int h, final String startUrl) {
+    /**
+     * Creates the browser with tabs for urls, and opens tab activeIndex.
+     * host is an Activity or other Context, or null.
+     */
+    public static void init(final Object host, final int w, final int h, final String[] urls, final int activeIndex) {
         synchronized (frameLock) {
             width = w;
             height = h;
@@ -112,7 +142,7 @@ public final class BrowserBridge {
             @Override
             public void run() {
                 try {
-                    create(host, startUrl);
+                    create(host, urls, activeIndex);
                 } catch (Throwable t) {
                     Log.e(TAG, "WebView creation failed", t);
                 }
@@ -134,74 +164,15 @@ public final class BrowserBridge {
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
-    private static void create(Object host, String startUrl) {
-        if (webView != null) return;
+    private static void create(Object host, String[] urls, int activeIndex) {
+        if (container != null) return;
         allowCleartextHttp();
         Context ctx = resolveContext(host);
         if (ctx == null) {
             Log.e(TAG, "No Context found, can not create WebView");
             return;
         }
-
-        webView = new WebView(ctx);
-        webView.setFocusable(true);
-        webView.setFocusableInTouchMode(true);
-        webView.setVerticalScrollBarEnabled(true);
-
-        WebSettings s = webView.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setUseWideViewPort(true);
-        s.setLoadWithOverviewMode(true);
-        s.setSupportZoom(true);
-        s.setBuiltInZoomControls(true);
-        s.setDisplayZoomControls(false);
-        s.setMediaPlaybackRequiresUserGesture(false);
-        // Links with target=_blank open in this view.
-        s.setSupportMultipleWindows(false);
-
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                currentUrl = url;
-            }
-
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                currentUrl = url;
-            }
-        });
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onReceivedTitle(WebView view, String title) {
-                currentTitle = title == null ? "" : title;
-            }
-
-            @Override
-            public void onProgressChanged(WebView view, int p) {
-                progress = p;
-            }
-
-            // A page asked for fullscreen (for example the video player). WebView gives us
-            // a view with the fullscreen content; we draw it, and send input to it, instead
-            // of the page until the page leaves fullscreen.
-            @Override
-            public void onShowCustomView(View view, CustomViewCallback callback) {
-                if (customView != null) exitFullscreen();
-                customView = view;
-                customViewCallback = callback;
-                container.addView(view, new FrameLayout.LayoutParams(viewWidth, viewHeight));
-                layout();
-                view.requestFocus();
-                Log.i(TAG, "Fullscreen on");
-            }
-
-            @Override
-            public void onHideCustomView() {
-                removeCustomView();
-            }
-        });
+        viewContext = ctx;
 
         // Chromium only runs timers and animations for a WebView that is in a
         // window. The window of a VR app is not shown in the headset, so we put
@@ -214,20 +185,193 @@ public final class BrowserBridge {
                 // We draw the page ourselves in drawFrame().
             }
         };
-        container.addView(webView, new FrameLayout.LayoutParams(width, height));
         if (ctx instanceof Activity) {
             ((Activity) ctx).addContentView(container, new ViewGroup.LayoutParams(width, height));
         }
         createUrlField(ctx);
-        layout();
 
         bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         canvas = new Canvas(bitmap);
         createReader();
 
-        webView.loadUrl(startUrl);
-        Log.i(TAG, "WebView created " + width + "x" + height + " in " + ctx.getClass().getName());
+        for (String url : urls) {
+            if (tabs.size() < MAX_TABS && url != null && !url.isEmpty()) tabs.add(new Tab(url));
+        }
+        if (tabs.isEmpty()) tabs.add(new Tab("about:blank"));
+        activeTab = -1;
+        activateTab(Math.max(0, Math.min(activeIndex, tabs.size() - 1)));
+        Log.i(TAG, "Browser created " + width + "x" + height + " with " + tabs.size() + " tabs in " + ctx.getClass().getName());
         if (active) startRenderLoop();
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private static WebView newWebView(final Tab tab) {
+        WebView view = new WebView(viewContext);
+        view.setFocusable(true);
+        view.setFocusableInTouchMode(true);
+        view.setVerticalScrollBarEnabled(true);
+        if (!hardwareRender) view.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+
+        WebSettings s = view.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setUseWideViewPort(true);
+        s.setLoadWithOverviewMode(true);
+        s.setSupportZoom(true);
+        s.setBuiltInZoomControls(true);
+        s.setDisplayZoomControls(false);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        // Links with target=_blank open in this tab.
+        s.setSupportMultipleWindows(false);
+
+        view.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView v, String url, Bitmap favicon) {
+                tab.url = url;
+                if (v == webView) currentUrl = url;
+                publishTabs();
+            }
+
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                tab.url = url;
+                if (v == webView) currentUrl = url;
+                publishTabs();
+            }
+        });
+        view.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onReceivedTitle(WebView v, String title) {
+                tab.title = title == null ? "" : title;
+                if (v == webView) currentTitle = tab.title;
+                publishTabs();
+            }
+
+            @Override
+            public void onProgressChanged(WebView v, int p) {
+                if (v == webView) progress = p;
+            }
+
+            // A page asked for fullscreen (for example the video player). WebView gives us
+            // a view with the fullscreen content; we draw it, and send input to it, instead
+            // of the page until the page leaves fullscreen.
+            @Override
+            public void onShowCustomView(View fullscreen, CustomViewCallback callback) {
+                if (tab.view != webView) {
+                    // Only the open tab can go fullscreen.
+                    callback.onCustomViewHidden();
+                    return;
+                }
+                if (customView != null) exitFullscreen();
+                customView = fullscreen;
+                customViewCallback = callback;
+                container.addView(fullscreen, new FrameLayout.LayoutParams(viewWidth, viewHeight));
+                layout();
+                fullscreen.requestFocus();
+                Log.i(TAG, "Fullscreen on");
+            }
+
+            @Override
+            public void onHideCustomView() {
+                removeCustomView();
+            }
+        });
+        return view;
+    }
+
+    /** Main thread: makes tab index the active tab. Creates and loads its WebView on first use. */
+    private static void activateTab(int index) {
+        if (index < 0 || index >= tabs.size() || index == activeTab) return;
+        if (customView != null) exitFullscreen();
+        editingUrl = false;
+        if (webView != null) {
+            webView.onPause();
+            container.removeView(webView);
+        }
+        activeTab = index;
+        Tab tab = tabs.get(index);
+        boolean fresh = tab.view == null;
+        if (fresh) tab.view = newWebView(tab);
+        webView = tab.view;
+        container.addView(webView, 0, new FrameLayout.LayoutParams(viewWidth, viewHeight));
+        layout();
+        if (fresh) webView.loadUrl(tab.url);
+        if (active) webView.onResume();
+        else webView.onPause();
+        webView.requestFocus();
+        currentUrl = tab.url;
+        currentTitle = tab.title;
+        progress = 100;
+        publishTabs();
+    }
+
+    /** Main thread: copies the tab list for the native side. */
+    private static void publishTabs() {
+        String[] urls = new String[tabs.size()];
+        String[] titles = new String[tabs.size()];
+        for (int i = 0; i < tabs.size(); i++) {
+            urls[i] = tabs.get(i).url;
+            titles[i] = tabs.get(i).title;
+        }
+        tabUrls = urls;
+        tabTitles = titles;
+        activeTabIndex = activeTab;
+        tabsVersion++;
+    }
+
+    /** Opens a new tab with url and makes it active. Does nothing at the tab limit. */
+    public static void newTab(final String url) {
+        ui.post(() -> {
+            if (container == null || tabs.size() >= MAX_TABS) return;
+            tabs.add(new Tab(url));
+            activateTab(tabs.size() - 1);
+        });
+    }
+
+    /** Opens tab index. */
+    public static void selectTab(final int index) {
+        ui.post(() -> {
+            if (container != null) activateTab(index);
+        });
+    }
+
+    /**
+     * Closes tab index; newActive is the active tab afterwards (index in the list
+     * without the closed tab). The native side keeps at least one tab.
+     */
+    public static void closeTab(final int index, final int newActive) {
+        ui.post(() -> {
+            if (container == null || index < 0 || index >= tabs.size() || tabs.size() < 2) return;
+            Tab tab = tabs.remove(index);
+            if (index == activeTab) {
+                if (customView != null) exitFullscreen();
+                container.removeView(webView);
+                webView = null;
+                activeTab = -1;
+                activateTab(Math.max(0, Math.min(newActive, tabs.size() - 1)));
+            } else {
+                if (index < activeTab) activeTab--;
+                publishTabs();
+            }
+            if (tab.view != null) tab.view.destroy();
+        });
+    }
+
+    /** Changes each time a tab opens, closes, or changes its URL or title. */
+    public static int getTabsVersion() {
+        return tabsVersion;
+    }
+
+    public static String[] getTabUrls() {
+        return tabUrls;
+    }
+
+    public static String[] getTabTitles() {
+        return tabTitles;
+    }
+
+    public static int getActiveTab() {
+        return activeTabIndex;
     }
 
     private static void createUrlField(Context ctx) {
@@ -284,8 +428,10 @@ public final class BrowserBridge {
     private static void layout() {
         int ws = View.MeasureSpec.makeMeasureSpec(viewWidth, View.MeasureSpec.EXACTLY);
         int hs = View.MeasureSpec.makeMeasureSpec(viewHeight, View.MeasureSpec.EXACTLY);
-        webView.measure(ws, hs);
-        webView.layout(0, 0, viewWidth, viewHeight);
+        if (webView != null) {
+            webView.measure(ws, hs);
+            webView.layout(0, 0, viewWidth, viewHeight);
+        }
         if (customView != null) {
             customView.measure(ws, hs);
             customView.layout(0, 0, viewWidth, viewHeight);
@@ -303,10 +449,10 @@ public final class BrowserBridge {
                 params.height = h;
                 container.setLayoutParams(params);
             }
-            webView.setLayoutParams(new FrameLayout.LayoutParams(w, h));
+            if (webView != null) webView.setLayoutParams(new FrameLayout.LayoutParams(w, h));
             if (customView != null) customView.setLayoutParams(new FrameLayout.LayoutParams(w, h));
             layout();
-            webView.invalidate();
+            if (webView != null) webView.invalidate();
             Log.i(TAG, "Viewport " + w + "x" + h);
         });
     }
@@ -432,7 +578,10 @@ public final class BrowserBridge {
 
     private static void useSoftwareRender() {
         hardwareRender = false;
-        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        // Tabs created later get the software layer in newWebView().
+        for (Tab tab : tabs) {
+            if (tab.view != null) tab.view.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
         Log.i(TAG, "Render path: software (no video)");
     }
 

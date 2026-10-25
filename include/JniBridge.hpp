@@ -5,13 +5,15 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // Native side of java/src/com/narze/questbrowser/BrowserBridge.java.
 // Call Init() from the Unity main thread. The other functions are safe to call
 // from any thread after Init() returns true.
 namespace QuestBrowser::Jni {
 
-bool Init(int width, int height, std::string_view startUrl);
+// Starts the browser with one tab per URL and opens tab activeTab.
+bool Init(int width, int height, std::vector<std::string> const& tabUrls, int activeTab);
 bool IsReady();
 
 void SetActive(bool active);
@@ -25,6 +27,17 @@ void Reload();
 // action: 0 down, 1 up, 2 move, 3 cancel (Android MotionEvent values).
 void Touch(int action, float x, float y);
 void Scroll(float x, float y, float amount);
+// Tabs. The Java side follows these calls; the rules are in tabs_logic.hpp.
+void NewTab(std::string_view url);
+void SelectTab(int index);
+// newActive: the active tab afterwards, in the list without the closed tab.
+void CloseTab(int index, int newActive);
+// Changes whenever a tab opens, closes, or changes its URL or title.
+int GetTabsVersion();
+std::vector<std::string> GetTabUrls();
+std::vector<std::string> GetTabTitles();
+int GetActiveTab();
+
 // In-game keyboard. Text and keys go to the address field while it is in use, else to the page.
 void SendText(std::string_view text);
 void SendKey(int androidKeyCode, int metaState);

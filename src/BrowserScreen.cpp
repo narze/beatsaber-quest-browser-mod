@@ -20,6 +20,7 @@
 #include "UnityEngine/Transform.hpp"
 #include "bsml/shared/BSML.hpp"
 #include "main.hpp"
+#include "TMPro/FontStyles.hpp"
 
 DEFINE_TYPE(QuestBrowser, BrowserScreen);
 
@@ -48,6 +49,14 @@ constexpr std::string_view kLayout = R"xml(
       <button text="&gt;" on-click="OnForward" pref-width="22" hover-hint="Forward"/>
       <button text="URL" on-click="OnUrl" pref-width="40" hover-hint="Type an address or a search"/>
       <button text="Menu" on-click="OnMenu" pref-width="40"/>
+    </horizontal>
+    <horizontal id="tabControls" spacing="1" pref-height="10" child-expand-width="false">
+      <button text="" on-click="OnTab0" pref-width="28"/>
+      <button text="" on-click="OnTab1" pref-width="28"/>
+      <button text="" on-click="OnTab2" pref-width="28"/>
+      <button text="" on-click="OnTab3" pref-width="28"/>
+      <button text="+" on-click="OnNewTab" pref-width="14" hover-hint="New tab"/>
+      <button text="x" on-click="OnCloseTab" pref-width="14" hover-hint="Close tab"/>
     </horizontal>
     <horizontal id="groupControls" spacing="1" pref-height="10" child-expand-width="false">
       <button text="Browse" on-click="OnBrowseGroup" pref-width="60"/>
@@ -87,7 +96,25 @@ BrowserScreen* BrowserScreen::CreateIn(Transform* parent) {
     screen->history = Config::GetHistory();
     screen->canvasGroup->alpha = Config::GetOpacity();
     screen->ChangeOpacity(0.0f);
-    for (auto row : {screen->mainControls, screen->groupControls, screen->browseControls, screen->viewControls, screen->viewStatus}) {
+    if (auto row = screen->tabControls) {
+        for (int i = 0; i < row->transform->childCount; ++i) {
+            auto button = row->transform->GetChild(i)->GetComponent<UI::Button*>();
+            if (!button) continue;
+            auto label = button->GetComponentInChildren<TMPro::TextMeshProUGUI*>();
+            if (i < Tabs::kStripSlots) {
+                if (label) {
+                    label->richText = false;
+                    label->enableWordWrapping = false;
+                    label->fontStyle = TMPro::FontStyles::Normal;
+                }
+                screen->tabButtons.push_back(button);
+                screen->tabLabels.push_back(label);
+            } else if (i == Tabs::kStripSlots) {
+                screen->newTabButton = button;
+            }
+        }
+    }
+    for (auto row : {screen->mainControls, screen->tabControls, screen->groupControls, screen->browseControls, screen->viewControls, screen->viewStatus}) {
         if (!row) continue;
         for (int i = 0; i < row->transform->childCount; ++i) {
             auto child = row->transform->GetChild(i);
@@ -138,9 +165,12 @@ void BrowserScreen::Setup() {
     // performance measurements.
 #define QB_STR2(x) #x
 #define QB_STR(x) QB_STR2(x)
-    ready = Jni::Init(kPageWidth, kPageHeight, "https://www.youtube.com/embed/" QB_STR(QB_DEBUG_YOUTUBE_ID) "?autoplay=1");
+    ready = Jni::Init(kPageWidth, kPageHeight, {"https://www.youtube.com/embed/" QB_STR(QB_DEBUG_YOUTUBE_ID) "?autoplay=1"}, 0);
 #else
-    ready = Jni::Init(kPageWidth, kPageHeight, Logic::kHomeUrl);
+    // Restore the tabs of the last session.
+    auto tabs = Tabs::Restore(Config::GetTabs(), Config::GetActiveTab(), Logic::kHomeUrl);
+    ready = Jni::Init(kPageWidth, kPageHeight, tabs.urls, tabs.active);
+    logger.info("Restored {} tabs, tab {} open", tabs.urls.size(), tabs.active + 1);
 #endif
     if (!ready) {
         if (titleText) titleText->text = "Browser failed to start. See the log for details.";
@@ -231,7 +261,8 @@ void BrowserScreen::OnZoomDown() { ChangeZoom(-0.1f); }
 void BrowserScreen::OnZoomUp() { ChangeZoom(0.1f); }
 
 float BrowserScreen::GetChromeHeight() const {
-    int rows = 1 + (menuOpen ? (viewOpen ? 3 : 2) : 0);
+    // Toolbar and tab strip, plus the menu rows when the menu is open.
+    int rows = 2 + (menuOpen ? (viewOpen ? 3 : 2) : 0);
     return 12.0f + rows * (10.0f * controlScale + 1.0f);
 }
 
@@ -245,6 +276,7 @@ void BrowserScreen::SetChromeHidden(bool hidden) {
 void BrowserScreen::RefreshControls() {
     bool show = !chromeHidden;
     if (mainControls) mainControls->gameObject->SetActive(show);
+    if (tabControls) tabControls->gameObject->SetActive(show);
     if (titleText) titleText->gameObject->SetActive(show);
     if (groupControls) groupControls->gameObject->SetActive(show && menuOpen);
     if (browseControls) browseControls->gameObject->SetActive(show && menuOpen && !viewOpen);
@@ -260,7 +292,7 @@ void BrowserScreen::RefreshControls() {
         label->enableAutoSizing = false;
         label->fontSize = 3.5f * controlScale;
     }
-    for (auto row : {mainControls, groupControls, browseControls, viewControls, viewStatus}) if (row) {
+    for (auto row : {mainControls, tabControls, groupControls, browseControls, viewControls, viewStatus}) if (row) {
         auto layout = row->GetComponent<UI::LayoutElement*>();
         if (layout) {
             layout->preferredHeight = 10 * controlScale;
@@ -372,6 +404,7 @@ void BrowserScreen::UpdateLabels() {
     labelTimer -= Time::get_deltaTime();
     if (labelTimer > 0.0f) return;
     labelTimer = 0.1f;
+    UpdateTabs();
 
     if (auto submitted = Jni::TakeSubmittedUrl()) {
         auto url = Logic::NormalizeUrl(*submitted);
@@ -520,5 +553,68 @@ void BrowserScreen::ChangeOpacity(float delta) {
 }
 void BrowserScreen::OnOpacityDown() { ChangeOpacity(-0.1f); }
 void BrowserScreen::OnOpacityUp() { ChangeOpacity(0.1f); }
+
+// ---- Tabs ------------------------------------------------------------------
+
+void BrowserScreen::UpdateTabs() {
+    int version = Jni::GetTabsVersion();
+    if (version == tabsVersion) return;
+    tabsVersion = version;
+    auto urls = Jni::GetTabUrls();
+    int active = Jni::GetActiveTab();
+    tabTitles = Jni::GetTabTitles();
+    // Save for the next session when the tab list changes (not for title changes).
+    if (!urls.empty() && (urls != tabUrls || active != activeTab)) Config::SetTabs(urls, active);
+    tabUrls = std::move(urls);
+    activeTab = active;
+    RefreshTabStrip();
+}
+
+void BrowserScreen::RefreshTabStrip() {
+    int count = static_cast<int>(tabUrls.size());
+    stripRange = Tabs::VisibleRange(count, activeTab, static_cast<int>(tabButtons.size()));
+    for (int slot = 0; slot < static_cast<int>(tabButtons.size()); ++slot) {
+        int index = stripRange.begin + slot;
+        bool used = index < stripRange.end;
+        if (tabButtons[slot]) tabButtons[slot]->gameObject->SetActive(used);
+        if (!used || !tabLabels[slot]) continue;
+        std::string title = index < static_cast<int>(tabTitles.size()) ? tabTitles[index] : "";
+        auto label = Tabs::Label(title, tabUrls[index], 14);
+        // Mark the open tab, and show that there are more tabs past the edges.
+        if (slot == 0 && stripRange.begin > 0) label = "< " + label;
+        if (slot == stripRange.end - stripRange.begin - 1 && stripRange.end < count) label += " >";
+        tabLabels[slot]->text = label;
+        tabLabels[slot]->color = index == activeTab ? Color(0.25f, 0.85f, 1.0f, 1.0f) : Color(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+    if (newTabButton) newTabButton->interactable = Tabs::CanAddTab(count);
+}
+
+void BrowserScreen::OnTabSlot(int slot) {
+    int index = stripRange.begin + slot;
+    if (index < stripRange.end && index != activeTab) Jni::SelectTab(index);
+}
+
+void BrowserScreen::OnTab0() { OnTabSlot(0); }
+void BrowserScreen::OnTab1() { OnTabSlot(1); }
+void BrowserScreen::OnTab2() { OnTabSlot(2); }
+void BrowserScreen::OnTab3() { OnTabSlot(3); }
+
+void BrowserScreen::OnNewTab() {
+    if (!Tabs::CanAddTab(static_cast<int>(tabUrls.size()))) return;
+    Jni::NewTab(Logic::kHomeUrl);
+    // Ready to type where to go.
+    Jni::BeginUrlEditing("");
+    if (keyboard) keyboard->SetVisible(true);
+}
+
+void BrowserScreen::OnCloseTab() {
+    int count = static_cast<int>(tabUrls.size());
+    if (count <= 1) {
+        // Keep one tab: closing the last one goes back to the home page.
+        Jni::LoadUrl(Logic::kHomeUrl);
+        return;
+    }
+    Jni::CloseTab(activeTab, Tabs::ActiveAfterClose(count, activeTab, activeTab));
+}
 
 }  // namespace QuestBrowser

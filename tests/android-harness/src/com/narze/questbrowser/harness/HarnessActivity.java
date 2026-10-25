@@ -38,14 +38,23 @@ public class HarnessActivity extends Activity {
             byte[] dex = readAsset("questbrowser.dex");
             ClassLoader loader = new InMemoryDexClassLoader(ByteBuffer.wrap(dex), getClassLoader());
             bridge = loader.loadClass("com.narze.questbrowser.BrowserBridge");
-            call("init", new Class<?>[] {Object.class, int.class, int.class, String.class},
-                    this, W, H, "file:///android_asset/test.html");
+            boolean tabsMode = "tabs".equals(getIntent().getStringExtra("mode"));
+            // Tabs test: restore two tabs with the second one open, like after a restart.
+            String[] urls = tabsMode
+                    ? new String[] {"file:///android_asset/test.html", "file:///android_asset/tab2.html"}
+                    : new String[] {"file:///android_asset/test.html"};
+            call("init", new Class<?>[] {Object.class, int.class, int.class, String[].class, int.class},
+                    this, W, H, urls, tabsMode ? 1 : 0);
             call("setActive", new Class<?>[] {boolean.class}, true);
         } catch (Throwable t) {
             Log.e(TAG, "FAIL setup", t);
             return;
         }
 
+        if ("tabs".equals(getIntent().getStringExtra("mode"))) {
+            runTabsTest();
+            return;
+        }
         if ("viewport".equals(getIntent().getStringExtra("mode"))) {
             call("loadUrl", new Class<?>[] {String.class}, "file:///android_asset/viewport.html");
             whenTitle("wide clicks=0", () -> {
@@ -208,6 +217,34 @@ public class HarnessActivity extends Activity {
         } finally {
             call("releaseFrame", new Class<?>[0]);
         }
+    }
+
+    private void logTabs(String label) {
+        String[] urls = (String[]) call("getTabUrls", new Class<?>[0]);
+        String[] titles = (String[]) call("getTabTitles", new Class<?>[0]);
+        Log.i(TAG, label + " count=" + urls.length + " active=" + call("getActiveTab", new Class<?>[0])
+                + " titles=" + String.join("|", titles));
+    }
+
+    /** Restore, lazy loading, new tab, switch, close. run.sh checks the log lines. */
+    private void runTabsTest() {
+        whenTitle("tab two", () -> {
+            logTabs("TABS_RESTORED");  // tab 0 is not loaded yet, so its title is empty
+            call("newTab", new Class<?>[] {String.class}, "file:///android_asset/test.html");
+            at(300, () -> whenTitle("ready", () -> {
+                logTabs("TABS_NEW");
+                call("selectTab", new Class<?>[] {int.class}, 1);
+                at(300, () -> whenTitle("tab two", () -> {
+                    logTabs("TABS_SELECTED");
+                    // Close the open tab (1); the next tab (the new one) becomes active at index 1.
+                    call("closeTab", new Class<?>[] {int.class, int.class}, 1, 1);
+                    at(300, () -> whenTitle("ready", () -> {
+                        logTabs("TABS_CLOSED");
+                        Log.i(TAG, "TABS_DONE");
+                    }, 50));
+                }, 50));
+            }, 50));
+        }, 50);
     }
 
     /** Runs r once the page title is title (checks every 200 ms, up to 20 s). */
