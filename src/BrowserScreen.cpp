@@ -223,6 +223,8 @@ void BrowserScreen::OnDisable() {
 }
 
 void BrowserScreen::Update() {
+    // The window: faster push and pull while its handle is held.
+    Window::BoostHandleDepth(this);
     if (!ready) return;
     UpdateTexture();
     UpdateInput();
@@ -282,7 +284,8 @@ void BrowserScreen::ChangeZoom(float delta) {
 
 void BrowserScreen::ChangeOpacity(float delta) {
     if (delta != 0.0f) Config::SetOpacity(Config::GetOpacity() + delta);
-    if (canvasGroup) canvasGroup->alpha = Config::GetOpacity();
+    // While a panel is open the window stays opaque; the new opacity applies when it closes.
+    if (canvasGroup) canvasGroup->alpha = openPanel == Panel::None ? Config::GetOpacity() : 1.0f;
     RefreshMenu();
 }
 
@@ -457,6 +460,8 @@ void BrowserScreen::ShowPanel(Panel panel) {
     for (std::size_t i = 0; i < panels.size(); ++i)
         if (panels[i]) panels[i]->SetActive(static_cast<int>(panel) == static_cast<int>(i) + 1);
     if (pageImage) pageImage->gameObject->SetActive(panel == Panel::None);
+    // Panels are fully opaque, so they are easy to read; the page uses the opacity setting.
+    if (canvasGroup) canvasGroup->alpha = panel == Panel::None ? Config::GetOpacity() : 1.0f;
     if (panel == Panel::Tabs) RefreshTabs();
     if (panel == Panel::Menu) RefreshMenu();
     if (panel == Panel::History) RefreshHistory();

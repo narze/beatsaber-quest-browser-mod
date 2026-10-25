@@ -59,6 +59,7 @@ void BuildSettings(UnityEngine::Transform* parent) {
 
     BSML::Lite::CreateUIButton(c, "Reset menu position", []() { Window::ResetPosition(PoseSlot::Menu); });
     BSML::Lite::CreateUIButton(c, "Reset in-song position", []() { Window::ResetPosition(PoseSlot::Song); });
+    BSML::Lite::CreateUIButton(c, "Reset keyboard position", []() { Config::ResetKeyboardPlacement(); });
 }
 
 void ShowSettings(HMUI::ViewController* viewController, bool firstActivation, bool, bool) {

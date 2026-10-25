@@ -84,23 +84,6 @@ ResizeGrip* ResizeGrip::Create(Transform* window, int axisX, int axisY, std::fun
     return grip;
 }
 
-ResizeGrip* ResizeGrip::CreateDepth(Transform* window, std::function<void()> onMoved) {
-    auto button = BSML::Lite::CreateUIButton(window, "Depth", Vector2(0, 0), Vector2(24, 8), []() {});
-    button->gameObject->name = "QuestBrowserDepthHandle";
-    auto rect = button->gameObject->GetComponent<RectTransform*>();
-    rect->anchorMin = {1, 0};
-    rect->anchorMax = {1, 0};
-    rect->pivot = {1, 0};
-    rect->anchoredPosition = {-11, 1};
-    rect->sizeDelta = {24, 8};
-    button->gameObject->AddComponent<CanvasGroup*>()->alpha = 0.65f;
-    auto grip = button->gameObject->AddComponent<ResizeGrip*>();
-    grip->window = window;
-    grip->depthMode = true;
-    grip->onMoved = std::move(onMoved);
-    return grip;
-}
-
 std::optional<Resize::Vec3> ResizeGrip::PointerOnWindowPlane() {
     UnityW<GlobalNamespace::VRController> controller = pointer->lastSelectedVrController;
     if (!controller || !window) return std::nullopt;
@@ -126,31 +109,17 @@ void ResizeGrip::Update() {
     if (dragging && dragController) controller = dragController;
     if (!controller) return;
     auto edge = trigger.Update(controller->triggerValue);
-    if (!depthMode) {
-        // Blue while pointed at or dragged.
-        if (auto image = GetComponent<HMUI::ImageView*>()) {
-            UnityW<GameObject> hovered = pointer->pointingOver;
-            bool hot = dragging || (hovered && hovered.ptr() == gameObject.ptr());
-            image->color = hot ? kActive : kIdle;
-        }
+    // Blue while pointed at or dragged.
+    if (auto image = GetComponent<HMUI::ImageView*>()) {
+        UnityW<GameObject> hovered = pointer->pointingOver;
+        bool hot = dragging || (hovered && hovered.ptr() == gameObject.ptr());
+        image->color = hot ? kActive : kIdle;
     }
 
     if (!dragging) {
         UnityW<GameObject> over = pointer->pointingOver;
         if (edge != Resize::Edge::Pressed || !over || !over->transform->IsChildOf(transform)) return;
         dragController = controller;
-        if (depthMode) {
-            auto camera = Camera::get_main();
-            if (!camera) return;
-            depthOrigin = camera->transform->position;
-            auto offset = Vector3::op_Subtraction(window->position, depthOrigin);
-            startDepth = offset.magnitude;
-            if (startDepth < 0.001f) return;
-            depthAxis = Vector3::Normalize(offset);
-            startController = controller->position;
-            dragging = true;
-            return;
-        }
         auto hit = PointerOnWindowPlane();
         if (!hit) return;
         dragging = true;
@@ -162,14 +131,6 @@ void ResizeGrip::Update() {
 
     if (!trigger.IsHeld()) {
         EndDrag();
-        return;
-    }
-    if (depthMode) {
-        auto delta = Vector3::op_Subtraction(controller->position, startController);
-        float distance = Resize::DepthFromDrag(startDepth, ToVec(delta), ToVec(depthAxis), Resize::kDepthGain);
-        window->position = Vector3(depthOrigin.x + depthAxis.x * distance,
-                                   depthOrigin.y + depthAxis.y * distance,
-                                   depthOrigin.z + depthAxis.z * distance);
         return;
     }
     if (auto hit = PointerOnWindowPlane()) {
@@ -190,10 +151,6 @@ void ResizeGrip::EndDrag() {
     dragging = false;
     dragController = nullptr;
     if (!window) return;
-    if (depthMode) {
-        if (onMoved) onMoved();
-        return;
-    }
     auto rect = window->GetComponent<RectTransform*>()->rect;
     logger.info("Resized browser window to {:.1f} x {:.1f}", rect.width, rect.height);
     if (onResized) onResized({rect.width, rect.height}, true);

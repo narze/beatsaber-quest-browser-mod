@@ -28,13 +28,6 @@ TEST_CASE("Distant controls keep their angular size and the window fits them") {
     CHECK((portrait.width - 6) / (portrait.height - 70) == doctest::Approx(9.0f / 16.0f));
 }
 
-TEST_CASE("Depth handle projects movement along viewing depth and clamps distance") {
-    CHECK(DepthFromDrag(3, {0, 0, 0.5f}, {0, 0, 1}) == doctest::Approx(3.5f));
-    CHECK(DepthFromDrag(3, {1, 2, 0}, {0, 0, 1}) == doctest::Approx(3));
-    CHECK(DepthFromDrag(3, {0, 0, -10}, {0, 0, 1}) == doctest::Approx(0.6f));
-    CHECK(DepthFromDrag(3, {0, 0, 10}, {0, 0, 1}) == doctest::Approx(8));
-}
-
 TEST_CASE("Free corner resize changes width and height independently") {
     auto size = DimensionsFromDrag({150, 126}, 25, -10, 1, -1, 0);
     CHECK(size.width == doctest::Approx(200));
@@ -106,14 +99,6 @@ TEST_CASE("TriggerLatch has hysteresis and reports the press and release edges")
     CHECK_FALSE(t.IsHeld());
 }
 
-TEST_CASE("DepthFromDrag: the gain makes the window move faster than the hand") {
-    // Hand 0.25 m forward with gain 4: the window moves 1 m.
-    CHECK(DepthFromDrag(3, {0, 0, 0.25f}, {0, 0, 1}, kDepthGain) == doctest::Approx(3 + 0.25f * kDepthGain));
-    CHECK(kDepthGain >= 3.0f);
-    // Limits still apply.
-    CHECK(DepthFromDrag(3, {0, 0, 5}, {0, 0, 1}, kDepthGain) == doctest::Approx(8));
-}
-
 TEST_CASE("The window is only the page: chrome is the padding, the default page is 16:9") {
     CHECK(kChromeHeight == doctest::Approx(6));
     Dimensions d;
@@ -131,4 +116,20 @@ TEST_CASE("PanelScale: panels designed at 144 x 81 fill the page area") {
     CHECK(PanelScale(288, 162) == doctest::Approx(2));
     CHECK(PanelScale(400, 100) == doctest::Approx(100.0f / 81.0f));  // limited by the height
     CHECK(PanelScale(144, 400) == doctest::Approx(1));               // limited by the width
+}
+
+TEST_CASE("HandleDepthStep: while holding the handle, the stick pushes the window faster than BSML alone") {
+    // BSML moves 1 m/s with the stick; with the extra step the total is kHandleDepthGain m/s.
+    float z = 2.0f;
+    float extra = HandleDepthStep(z, 1.0f, 0.5f) - z;
+    CHECK(1.0f * 0.5f + extra == doctest::Approx(kHandleDepthGain * 0.5f));
+    CHECK(kHandleDepthGain >= 3.0f);
+    // Pulling works the same way.
+    CHECK(HandleDepthStep(z, -1.0f, 0.5f) < z);
+}
+
+TEST_CASE("HandleDepthStep: a slight stick wobble does nothing, and the distance has limits") {
+    CHECK(HandleDepthStep(2.0f, 0.1f, 1.0f) == doctest::Approx(2.0f));
+    CHECK(HandleDepthStep(7.9f, 1.0f, 1.0f) <= 8.0f);
+    CHECK(HandleDepthStep(0.4f, -1.0f, 1.0f) >= 0.3f);
 }

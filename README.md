@@ -10,16 +10,15 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 2. The browser is one floating window. It stays open in the menu and in songs, and the page does not reload between them.
    - **Browser** in the mods list on the left of the main menu opens the browser settings (also in Mod settings > **Browser**). The **Show browser** switch there shows or hides the window.
    - Lost the window? Hold the **reset keybind** (default **X + Y**) for 0.6 s. The window shows again at its default size, centered and raised above the song selection. It works in the menu and while paused, not while a song plays. Choose the combo, or Off, in the Browser settings.
-   - Menu: click the page, drag the handle below the window to move it, and drag a corner or edge grip to resize it. Edge grips change one dimension; corner grips change both independently in Free mode. Resizing stays centered on the window.
-   - Resize grips are small translucent cubes. Hold the **Depth** handle near the bottom-right corner and push/pull your controller to move the window farther away/closer (0.6–8 m from your starting head position). Release to save its position separately for menus and songs.
+   - Menu: click the page, drag the handle above the window to move it (while you hold it, push the thumbstick up or down to move it away or closer), and drag its corners and edges to resize it.
    - Song: the page shows, but you can not click it. Pause to click, move, or resize it.
    - The menu and songs each keep their own window position and size.
 3. Controls:
    - The window shows only the page. Point at it and a slim toolbar fades in below it: **back**, **forward**, **reload**, the page title (click it to type an address or a search), **tabs** (with the number of tabs), and **menu**.
    - **Tabs** lists your tabs: open one, close one with **x**, or **+ New tab** (opens the keyboard). Up to 10 tabs; background tabs are paused. Tabs come back at the next start, and each loads when you open it.
-   - **Menu**: Home, History, Keyboard, Zoom, Opacity, and the window shape. Panel text grows with the window.
+   - **Menu**: Home, History, Keyboard, Zoom, Opacity, and the window shape. Panel text grows with the window, and panels are fully opaque.
    - Resize with the brackets on the corners and the bars on the edges; they turn blue when you point at them.
-   - Tap a text field on the page to open the keyboard. It opens near you (about 55 cm in front, below your eyes, tilted like a laptop keyboard) and stays there while you type. Fullscreen video fills the window; back or **Esc** leaves fullscreen.
+   - Tap a text field on the page to open the keyboard. It opens near you (50 cm in front, 45 cm below your eyes, tilted like a laptop keyboard) and stays there while you type. Drag its handle to move it; it opens there, relative to where you face, next time. **Reset keyboard position** in the settings brings it back. Fullscreen video fills the window; back or **Esc** leaves fullscreen.
    - Back, Forward, URL, and **Menu** stay visible. **Menu > Browse** contains Reload, Home, Keyboard, and History. **Menu > View** contains aspect, zoom, and opacity controls (**Fade - / +**). Close Menu to give the page more room.
    - Buttons and labels grow with distance. The minimum window size fits the controls; there is no maximum window width or height.
    - Point at the page and pull the trigger to click. Hold the trigger and move to drag.

@@ -45,6 +45,16 @@ float GetZoom();
 void SetZoom(float zoom);
 float GetOpacity();
 void SetOpacity(float value);
+// Where the keyboard opens, relative to the direction the player faces: offset in
+// meters (x right, y up, z away) and turn relative to facing the player.
+struct KeyboardPlacement {
+    UnityEngine::Vector3 offset;
+    UnityEngine::Quaternion rotation;
+};
+KeyboardPlacement GetKeyboardPlacement();
+void SetKeyboardPlacement(KeyboardPlacement const& placement);
+void ResetKeyboardPlacement();
+
 // Open tabs, restored at the next start.
 std::vector<std::string> GetTabs();
 int GetActiveTab();

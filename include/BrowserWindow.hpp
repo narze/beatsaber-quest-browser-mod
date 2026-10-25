@@ -1,5 +1,6 @@
 #pragma once
 
+#include "UnityEngine/Component.hpp"
 #include "UnityEngine/MonoBehaviour.hpp"
 #include "browser_logic.hpp"
 #include "custom-types/shared/macros.hpp"
@@ -19,6 +20,9 @@ void ResetPositions();
 void ResetPosition(Logic::PoseSlot slot);
 // Keybind: show the window and reset the position of the current context (menu or song).
 void ResetCurrentPosition();
+// While the player holds the move handle of `screen`, the thumbstick pushes or pulls
+// it faster than BSML alone. Call every frame.
+void BoostHandleDepth(UnityEngine::Component* screen);
 // Menu, song playing, or song paused.
 Logic::Context CurrentContext();
 void FitControls();

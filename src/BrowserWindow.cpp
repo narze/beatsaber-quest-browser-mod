@@ -11,6 +11,9 @@
 #include "UnityEngine/Transform.hpp"
 #include "beatsaber-hook/shared/utils/hooking.hpp"
 #include "bsml/shared/BSML/FloatingScreen/FloatingScreen.hpp"
+#include "bsml/shared/BSML/FloatingScreen/FloatingScreenHandle.hpp"
+#include "GlobalNamespace/VRController.hpp"
+#include "UnityEngine/Time.hpp"
 #include "main.hpp"
 
 DEFINE_TYPE(QuestBrowser, SongScope);
@@ -75,11 +78,6 @@ void EnsureCreated() {
     for (auto axes : {Vector2(1, -1), Vector2(-1, -1), Vector2(1, 1), Vector2(-1, 1),
                       Vector2(-1, 0), Vector2(1, 0), Vector2(0, 1), Vector2(0, -1)})
         resizeGrips.emplace_back(ResizeGrip::Create(screen->transform, static_cast<int>(axes.x), static_cast<int>(axes.y), ApplyDimensions));
-    resizeGrips.emplace_back(ResizeGrip::CreateDepth(screen->transform, []() {
-        if (!placedFor || !floatingScreen) return;
-        auto t = floatingScreen->transform;
-        Config::SetPose(*placedFor, {t->position, t->rotation, t->localScale.x});
-    }));
     logger.info("Created browser window");
 }
 
@@ -133,6 +131,18 @@ void ToggleVisible() {
 }
 
 void Refresh() { Apply(); }
+
+void BoostHandleDepth(Component* screenComponent) {
+    if (!screenComponent) return;
+    auto screen = screenComponent->GetComponent<BSML::FloatingScreen*>();
+    if (!screen || !screen->handle || !screen->handle->m_CachedPtr.m_value) return;
+    auto handle = screen->handle->GetComponent<BSML::FloatingScreenHandle*>();
+    if (!handle || !handle->_grabbingController) return;
+    auto grab = handle->_grabPos;
+    float stick = handle->_grabbingController->thumbstick.y;
+    grab.z = Resize::HandleDepthStep(grab.z, stick, Time::get_unscaledDeltaTime());
+    handle->_grabPos = grab;
+}
 
 Logic::Context CurrentContext() { return context; }
 

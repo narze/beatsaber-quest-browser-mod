@@ -22,7 +22,6 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, ResizeGrip, UnityEngine::MonoBehaviour) {
     // onResized receives dimensions during the drag; final=true saves them on release.
     static ResizeGrip* Create(UnityEngine::Transform* window, int axisX, int axisY,
                               std::function<void(Resize::Dimensions, bool)> onResized);
-    static ResizeGrip* CreateDepth(UnityEngine::Transform* window, std::function<void()> onMoved);
 
    private:
     std::optional<Resize::Vec3> PointerOnWindowPlane();
@@ -34,8 +33,4 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, ResizeGrip, UnityEngine::MonoBehaviour) {
     int axisX = 1, axisY = -1;
     Resize::Dimensions startSize;
     UnityEngine::Vector3 startPoint;
-    bool depthMode = false;
-    std::function<void()> onMoved;
-    UnityEngine::Vector3 startController, depthOrigin, depthAxis;
-    float startDepth = 0;
 };

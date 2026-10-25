@@ -177,6 +177,32 @@ void SetStrings(char const* key, std::vector<std::string> const& values) {
 
 }  // namespace
 
+namespace {
+// Tilted back so that it faces the eyes, like a laptop keyboard.
+constexpr float kKeyboardTiltDegrees = 50.0f;
+}  // namespace
+
+KeyboardPlacement GetKeyboardPlacement() {
+    auto tilt = UnityEngine::Quaternion::Euler(kKeyboardTiltDegrees, 0.0f, 0.0f);
+    return {{GetFloat("kbX", 0), GetFloat("kbY", 0), GetFloat("kbZ", 0)},
+            {GetFloat("kbRotX", tilt.x), GetFloat("kbRotY", tilt.y), GetFloat("kbRotZ", tilt.z), GetFloat("kbRotW", tilt.w)}};
+}
+
+void SetKeyboardPlacement(KeyboardPlacement const& p) {
+    SetFloat("kbX", p.offset.x);
+    SetFloat("kbY", p.offset.y);
+    SetFloat("kbZ", p.offset.z);
+    SetFloat("kbRotX", p.rotation.x);
+    SetFloat("kbRotY", p.rotation.y);
+    SetFloat("kbRotZ", p.rotation.z);
+    SetFloat("kbRotW", p.rotation.w);
+    Get().Write();
+}
+
+void ResetKeyboardPlacement() {
+    SetKeyboardPlacement({{0, 0, 0}, UnityEngine::Quaternion::Euler(kKeyboardTiltDegrees, 0.0f, 0.0f)});
+}
+
 std::vector<std::string> GetTabs() { return GetStrings("tabs", 64); }
 int GetActiveTab() { return static_cast<int>(GetFloat("activeTab", 0)); }
 void SetTabs(std::vector<std::string> const& urls, int active) {

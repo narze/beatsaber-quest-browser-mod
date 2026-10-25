@@ -13,6 +13,8 @@
 #include "UnityEngine/UI/LayoutElement.hpp"
 #include "bsml/shared/BSML-Lite.hpp"
 #include "bsml/shared/BSML/Components/Backgroundable.hpp"
+#include "BrowserWindow.hpp"
+#include "Config.hpp"
 #include "UnityEngine/Camera.hpp"
 #include "main.hpp"
 #include "placement_logic.hpp"
@@ -33,10 +35,23 @@ constexpr float kFontSize = 3.6f;
 // Below the window, tilted toward the player like a laptop keyboard.
 constexpr float kGap = 9.0f;  // clears the move handle at the bottom edge of the window
 constexpr float kTiltDegrees = 30.0f;
-// Near the player: tilted back so that it faces the eyes, like a laptop keyboard,
-// at 0.45 cm per UI unit (about 68 cm wide).
-constexpr float kNearTiltDegrees = 50.0f;
+// Near the player, at 0.45 cm per UI unit (about 68 cm wide).
 constexpr float kNearScale = 0.0045f;
+
+Placement::Point ToPoint(Vector3 v) { return {v.x, v.y, v.z}; }
+
+// The player moved the keyboard with its handle: keep that spot for the next time,
+// relative to the direction the player faces now.
+void OnHandleReleased(BSML::FloatingScreen* screen, BSML::FloatingScreenHandleEventArgs const& args) {
+    auto camera = Camera::get_main();
+    if (!camera || !screen) return;
+    auto head = camera->transform;
+    auto offset = Placement::ToHeadFrame(ToPoint(head->position), ToPoint(head->forward), ToPoint(args.position));
+    float yaw = Placement::KeyboardNearHead(ToPoint(head->position), ToPoint(head->forward)).yawDegrees;
+    auto relative = Quaternion::op_Multiply(Quaternion::Inverse(Quaternion::Euler(0.0f, yaw, 0.0f)), args.rotation);
+    Config::SetKeyboardPlacement({{offset.x, offset.y, offset.z}, relative});
+    logger.info("Saved keyboard position: right {:.2f} m, up {:.2f} m, away {:.2f} m", offset.x, offset.y, offset.z);
+}
 
 Color const kNormalText{1.0f, 1.0f, 1.0f, 1.0f};
 Color const kActiveText{0.25f, 0.85f, 1.0f, 1.0f};
@@ -77,8 +92,11 @@ Vector2 PanelSize() {
 
 KeyboardPanel* KeyboardPanel::Create(Transform* window, float windowHeight) {
     auto size = PanelSize();
-    auto screen = BSML::FloatingScreen::CreateFloatingScreen(size, false, window->position, window->rotation, 0.0f, false);
+    // With a handle on top, so the player can move it.
+    auto screen = BSML::FloatingScreen::CreateFloatingScreen(size, true, window->position, window->rotation, 0.0f, false);
     screen->name = "QuestBrowserKeyboard";
+    screen->set_HandleSide(BSML::Side::Top);
+    screen->HandleReleased.addCallback(&OnHandleReleased);
     Object::DontDestroyOnLoad(screen->gameObject);
 
     auto panel = screen->gameObject->AddComponent<KeyboardPanel*>();
@@ -92,6 +110,7 @@ KeyboardPanel* KeyboardPanel::Create(Transform* window, float windowHeight) {
 }
 
 void KeyboardPanel::LateUpdate() {
+    Window::BoostHandleDepth(this);
     // Near the player it stays where it opened; it only follows the window as a fallback.
     if (!placedNearUser) FollowAnchor();
 }
@@ -103,9 +122,10 @@ bool KeyboardPanel::PlaceNearUser() {
     auto head = camera->transform;
     auto p = head->position;
     auto f = head->forward;
-    auto pose = Placement::KeyboardNearHead({p.x, p.y, p.z}, {f.x, f.y, f.z});
+    auto saved = Config::GetKeyboardPlacement();
+    auto pose = Placement::KeyboardNearHead({p.x, p.y, p.z}, {f.x, f.y, f.z}, ToPoint(saved.offset));
     transform->position = Vector3(pose.position.x, pose.position.y, pose.position.z);
-    transform->rotation = Quaternion::Euler(kNearTiltDegrees, pose.yawDegrees, 0.0f);
+    transform->rotation = Quaternion::op_Multiply(Quaternion::Euler(0.0f, pose.yawDegrees, 0.0f), saved.rotation);
     transform->localScale = Vector3(kNearScale, kNearScale, kNearScale);
     return true;
 }

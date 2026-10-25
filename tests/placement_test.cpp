@@ -52,3 +52,32 @@ TEST_CASE("KeyboardNearHead: straight up or down keeps a forward direction") {
     CHECK(std::isfinite(up.position.x));
     CHECK(std::isfinite(up.position.z));
 }
+
+TEST_CASE("Keyboard default is low: well below the eyes") {
+    CHECK(kKeyboardDrop >= 0.4f);
+}
+
+TEST_CASE("Keyboard offset: saved in the facing direction, applied the same way when facing elsewhere") {
+    // The player moved the keyboard 0.1 m right, 0.05 m up and 0.2 m away, facing +z.
+    Point head{0, 1.7f, 0};
+    auto base = KeyboardNearHead(head, {0, 0, 1});
+    Point moved{base.position.x + 0.1f, base.position.y + 0.05f, base.position.z + 0.2f};
+    auto offset = ToHeadFrame(head, {0, 0, 1}, moved);
+    CHECK(offset.x == doctest::Approx(0.1f));   // right
+    CHECK(offset.y == doctest::Approx(0.05f));  // up
+    CHECK(offset.z == doctest::Approx(0.2f));   // away
+
+    // Facing +x, "right" is -z and "away" is +x.
+    auto pose = KeyboardNearHead({0, 1.7f, 0}, {1, 0, 0}, offset);
+    CHECK(pose.position.x == doctest::Approx(kKeyboardDistance + 0.2f));
+    CHECK(pose.position.z == doctest::Approx(-0.1f));
+    CHECK(pose.position.y == doctest::Approx(1.7f - kKeyboardDrop + 0.05f));
+}
+
+TEST_CASE("Keyboard offset: zero offset is the default pose") {
+    auto a = KeyboardNearHead({0, 1.7f, 0}, {0, 0, 1});
+    auto b = KeyboardNearHead({0, 1.7f, 0}, {0, 0, 1}, {0, 0, 0});
+    CHECK(a.position.x == doctest::Approx(b.position.x));
+    CHECK(a.position.y == doctest::Approx(b.position.y));
+    CHECK(a.position.z == doctest::Approx(b.position.z));
+}

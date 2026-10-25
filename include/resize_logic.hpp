@@ -58,13 +58,14 @@ inline Vec3 Sub(Vec3 a, Vec3 b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
 inline float Dot(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 inline float Length(Vec3 a) { return std::sqrt(Dot(a, a)); }
 
-// The window moves this many times as far as the hand, so a short arm movement
-// covers the 0.6 m to 8 m range.
-constexpr float kDepthGain = 4.0f;
+// Push and pull while holding a move handle. BSML moves the held screen 1 m/s along
+// the controller with the thumbstick; this extra step makes the total kHandleDepthGain.
+constexpr float kHandleDepthGain = 4.0f;
 
-// Controller motion sideways/upwards does not affect depth. Axis must be normalized.
-inline float DepthFromDrag(float startDistance, Vec3 controllerDelta, Vec3 axis, float gain = 1.0f) {
-    return std::clamp(startDistance + gain * Dot(controllerDelta, axis), 0.6f, 8.0f);
+// New grab distance (meters along the controller) after one frame of extra push.
+inline float HandleDepthStep(float grabDistance, float stickY, float deltaSeconds) {
+    if (stickY > -0.2f && stickY < 0.2f) return grabDistance;
+    return std::clamp(grabDistance + (kHandleDepthGain - 1.0f) * stickY * deltaSeconds, 0.3f, 8.0f);
 }
 
 // Where the ray (origin, direction) meets the plane (point, normal).
