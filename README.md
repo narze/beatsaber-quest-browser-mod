@@ -17,8 +17,9 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 3. Controls:
    - The window shows only the page. Point at it and a slim toolbar fades in below it: **back**, **forward**, **reload**, the page title (click it to type an address or a search), **tabs** (with the number of tabs), and **menu**.
    - **Tabs** lists your tabs: open one, close one with **x**, or **+ New tab** (opens the keyboard). Up to 10 tabs; background tabs are paused. Tabs come back at the next start, and each loads when you open it.
-   - **Menu**: Home, History, Keyboard, Zoom, Opacity, and the window shape.
-   - Tap a text field on the page to open the keyboard. Fullscreen video fills the window; back or **Esc** leaves fullscreen.
+   - **Menu**: Home, History, Keyboard, Zoom, Opacity, and the window shape. Panel text grows with the window.
+   - Resize with the brackets on the corners and the bars on the edges; they turn blue when you point at them.
+   - Tap a text field on the page to open the keyboard. It opens near you (about 55 cm in front, below your eyes, tilted like a laptop keyboard) and stays there while you type. Fullscreen video fills the window; back or **Esc** leaves fullscreen.
    - Back, Forward, URL, and **Menu** stay visible. **Menu > Browse** contains Reload, Home, Keyboard, and History. **Menu > View** contains aspect, zoom, and opacity controls (**Fade - / +**). Close Menu to give the page more room.
    - Buttons and labels grow with distance. The minimum window size fits the controls; there is no maximum window width or height.
    - Point at the page and pull the trigger to click. Hold the trigger and move to drag.

@@ -79,6 +79,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     Panel openPanel = Panel::None;
     std::vector<UnityW<UnityEngine::GameObject>> panels;  // indexed by Panel - 1
     std::vector<UnityW<UnityEngine::UI::LayoutElement>> panelSizes;
+    // Content of each panel, designed at 144 x 81 and scaled to fill the page area.
+    std::vector<UnityW<UnityEngine::RectTransform>> panelContents;
 
     bool chromeHidden = false;
     Resize::Dimensions dimensions;

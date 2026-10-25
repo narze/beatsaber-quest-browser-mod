@@ -11,6 +11,9 @@
 #include "UnityEngine/Texture2D.hpp"
 #include "UnityEngine/TextureFormat.hpp"
 #include "bsml/shared/BSML-Lite.hpp"
+#include "UnityEngine/Color.hpp"
+#include "UnityEngine/Quaternion.hpp"
+#include "icons_logic.hpp"
 #include "main.hpp"
 
 DEFINE_TYPE(QuestBrowser, ResizeGrip);
@@ -21,45 +24,56 @@ namespace QuestBrowser {
 
 namespace {
 
-constexpr float kGripSize = 7.0f;  // UI units
+constexpr float kCornerSize = 12.0f;  // UI units
+constexpr float kEdgeLength = 22.0f;
+constexpr float kEdgeThickness = 7.0f;
+
+Color const kIdle{1.0f, 1.0f, 1.0f, 0.45f};
+Color const kActive{0.25f, 0.85f, 1.0f, 1.0f};
 
 Resize::Vec3 ToVec(Vector3 v) { return {v.x, v.y, v.z}; }
 
-// A translucent cube with three shaded faces; the same compact size on every grip.
-Sprite* GripSprite() {
-    constexpr int n = 32;
-    ArrayW<uint8_t> pixels(static_cast<il2cpp_array_size_t>(n * n * 4));
-    for (int y = 0; y < n; y++) {
-        for (int x = 0; x < n; x++) {
-            float u = (x - 15.5f) / 14.0f;
-            float v = (y - 15.5f) / 14.0f;
-            bool inside = std::fabs(u) <= 1 && std::fabs(v) <= 1 - std::fabs(u) * 0.5f;
-            uint8_t shade = v >= std::fabs(u) * 0.5f ? 255 : u < 0 ? 195 : 145;
-            int i = (y * n + x) * 4;
-            pixels[i] = shade;
-            pixels[i + 1] = shade;
-            pixels[i + 2] = shade;
-            pixels[i + 3] = inside ? 120 : 0;
-        }
-    }
+Sprite* IconSprite(Icons::Kind kind) {
+    constexpr int n = 64;
+    auto px = Icons::Draw(kind, n);
+    ArrayW<uint8_t> data(static_cast<il2cpp_array_size_t>(px.size()));
+    std::copy(px.begin(), px.end(), data.begin());
     auto tex = Texture2D::New_ctor(n, n, TextureFormat::RGBA32, false);
-    tex->LoadRawTextureData(pixels);
+    tex->LoadRawTextureData(data);
     tex->Apply(false);
     return BSML::Lite::TextureToSprite(tex);
+}
+
+// Turn of the bottom-left bracket for each corner, and of the horizontal bar for each edge.
+float GripRotation(int axisX, int axisY) {
+    if (axisX != 0 && axisY != 0) {
+        if (axisX < 0 && axisY < 0) return 0.0f;
+        if (axisX > 0 && axisY < 0) return 90.0f;
+        if (axisX > 0 && axisY > 0) return 180.0f;
+        return 270.0f;
+    }
+    return axisX != 0 ? 90.0f : 0.0f;
 }
 
 }  // namespace
 
 ResizeGrip* ResizeGrip::Create(Transform* window, int axisX, int axisY, std::function<void(Resize::Dimensions, bool)> onResized) {
-    auto image = BSML::Lite::CreateImage(window, GripSprite(), {0, 0}, {kGripSize, kGripSize});
+    // Corners: an L bracket. Edges: a short pill along the edge.
+    bool corner = axisX != 0 && axisY != 0;
+    Vector2 size = corner ? Vector2(kCornerSize, kCornerSize) : Vector2(kEdgeLength, kEdgeThickness);
+    auto image = BSML::Lite::CreateImage(window, IconSprite(corner ? Icons::Kind::CornerBracket : Icons::Kind::EdgeBar), {0, 0}, size);
     image->gameObject->name = "QuestBrowserResizeGrip";
     auto rect = image->rectTransform;
     Vector2 anchor{axisX < 0 ? 0.0f : axisX > 0 ? 1.0f : 0.5f, axisY < 0 ? 0.0f : axisY > 0 ? 1.0f : 0.5f};
     rect->anchorMin = anchor;
     rect->anchorMax = anchor;
-    rect->pivot = anchor;
-    rect->anchoredPosition = {axisX * -0.5f, axisY * -0.5f};
-    rect->sizeDelta = {kGripSize, kGripSize};
+    // Centered on the corner or the edge middle; the rotation turns the shape around that point.
+    rect->pivot = {0.5f, 0.5f};
+    float inset = corner ? kCornerSize / 2.0f - 1.0f : kEdgeThickness / 2.0f;
+    rect->anchoredPosition = {-axisX * inset, -axisY * inset};
+    rect->sizeDelta = size;
+    rect->localRotation = Quaternion::Euler(0.0f, 0.0f, GripRotation(axisX, axisY));
+    image->color = kIdle;
     image->raycastTarget = true;
 
     auto grip = image->gameObject->AddComponent<ResizeGrip*>();
@@ -96,7 +110,12 @@ std::optional<Resize::Vec3> ResizeGrip::PointerOnWindowPlane() {
 
 void ResizeGrip::Update() {
     if (!window) return;
-    float controls = Window::GetControlScale();
+    // Grow with distance so the grips stay easy to hit.
+    float controls = 1.0f;
+    if (auto camera = Camera::get_main()) {
+        auto offset = Vector3::op_Subtraction(window->position, camera->transform->position);
+        controls = Resize::ControlScale(offset.magnitude, window->lossyScale.x);
+    }
     transform->localScale = Vector3(controls, controls, controls);
     // Each scene has its own pointer; find it again when the old one is gone or disabled.
     if (!pointer || !pointer->isActiveAndEnabled) {
@@ -107,6 +126,14 @@ void ResizeGrip::Update() {
     if (dragging && dragController) controller = dragController;
     if (!controller) return;
     auto edge = trigger.Update(controller->triggerValue);
+    if (!depthMode) {
+        // Blue while pointed at or dragged.
+        if (auto image = GetComponent<HMUI::ImageView*>()) {
+            UnityW<GameObject> hovered = pointer->pointingOver;
+            bool hot = dragging || (hovered && hovered.ptr() == gameObject.ptr());
+            image->color = hot ? kActive : kIdle;
+        }
+    }
 
     if (!dragging) {
         UnityW<GameObject> over = pointer->pointingOver;

@@ -125,3 +125,10 @@ TEST_CASE("MigrateHeight removes the old in-window toolbar from saved heights") 
     CHECK(MigrateHeight(300) == doctest::Approx(266));
     CHECK(MigrateHeight(100) == doctest::Approx(87));  // never below the minimum
 }
+
+TEST_CASE("PanelScale: panels designed at 144 x 81 fill the page area") {
+    CHECK(PanelScale(144, 81) == doctest::Approx(1));
+    CHECK(PanelScale(288, 162) == doctest::Approx(2));
+    CHECK(PanelScale(400, 100) == doctest::Approx(100.0f / 81.0f));  // limited by the height
+    CHECK(PanelScale(144, 400) == doctest::Approx(1));               // limited by the width
+}

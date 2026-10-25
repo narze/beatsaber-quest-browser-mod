@@ -9,7 +9,8 @@
 #include "custom-types/shared/macros.hpp"
 #include "keyboard_logic.hpp"
 
-// The browser keyboard, drawn in the game below the browser window.
+// The browser keyboard. It opens near the player (in front, below the eyes), where it
+// is large enough to type on; without a camera it falls back to below the window.
 // Key presses go to the page, or to the address field while it is in use.
 //
 // It is on its own floating screen, not inside the window: the window screen has a
@@ -38,6 +39,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, KeyboardPanel, UnityEngine::MonoBehaviour) {
 
     void Build(UnityEngine::Vector2 size);
     void FollowAnchor();
+    bool PlaceNearUser();
+    bool placedNearUser = false;
     void OnKey(Keys::KeyDef const& key);
     void RefreshLabels();
 

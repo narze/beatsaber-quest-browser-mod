@@ -64,3 +64,21 @@ TEST_CASE("Icons: Back points left, Forward points right") {
     CHECK(leftInkBack > 0);  // the tip of < is on the left half of the middle row
     CHECK(leftInkFwd == 0);  // > has its tip on the right
 }
+
+TEST_CASE("Grip icons: the corner bracket has ink on its left and bottom edges only") {
+    auto px = Icons::Draw(Icons::Kind::CornerBracket, 64);
+    auto alphaAt = [&](int x, int y) { return px[(y * 64 + x) * 4 + 3]; };
+    CHECK(alphaAt(8, 40) > 128);   // left stroke
+    CHECK(alphaAt(40, 8) > 128);   // bottom stroke
+    CHECK(alphaAt(40, 40) == 0);   // open inside
+    CHECK(alphaAt(60, 60) == 0);   // top-right corner empty
+}
+
+TEST_CASE("Grip icons: the edge bar is a horizontal pill in the middle") {
+    auto px = Icons::Draw(Icons::Kind::EdgeBar, 64);
+    auto alphaAt = [&](int x, int y) { return px[(y * 64 + x) * 4 + 3]; };
+    CHECK(alphaAt(32, 32) > 128);
+    CHECK(alphaAt(12, 32) > 128);
+    CHECK(alphaAt(32, 52) == 0);
+    CHECK(alphaAt(2, 32) == 0);
+}

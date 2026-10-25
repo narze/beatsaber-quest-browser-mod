@@ -28,6 +28,12 @@ inline float ControlScale(float distance, float worldScale) {
 // (34 units at the default size); the page keeps its size without them.
 inline float MigrateHeight(float height) { return std::max(81.0f + kChromeHeight, height - 34.0f); }
 
+// Panels (tabs, menu, history) are designed for a 144 x 81 page and scaled up to
+// fill the page area, so their text grows with the window.
+inline float PanelScale(float pageWidth, float pageHeight) {
+    return std::min(pageWidth / 144.0f, pageHeight / 81.0f);
+}
+
 inline Dimensions DimensionsFromDrag(Dimensions start, float dx, float dy, int axisX, int axisY, float aspect,
                                      float controls = 1, float chrome = kChromeHeight) {
     float minWidth = kPaddingWidth + 144 * controls;

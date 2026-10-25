@@ -19,6 +19,7 @@
 #include "UnityEngine/TextureWrapMode.hpp"
 #include "UnityEngine/Time.hpp"
 #include "UnityEngine/Transform.hpp"
+#include "UnityEngine/UI/ContentSizeFitter.hpp"
 #include "UnityEngine/UI/HorizontalLayoutGroup.hpp"
 #include "UnityEngine/UI/VerticalLayoutGroup.hpp"
 #include "bsml/shared/BSML-Lite.hpp"
@@ -249,6 +250,10 @@ void BrowserScreen::SetDimensions(Resize::Dimensions size) {
         panel->preferredWidth = pageWidth;
         panel->preferredHeight = pageHeight;
     }
+    // Panel text and buttons grow with the window.
+    float panelScale = Resize::PanelScale(pageWidth, pageHeight);
+    for (auto& content : panelContents)
+        if (content) content->localScale = Vector3(panelScale, panelScale, 1.0f);
     if (keyboard) keyboard->SetWindowHeight(size.height);
     if (toolbar) toolbar->SetWindowSize(size.width, size.height);
     viewportDirty = true;
@@ -416,20 +421,34 @@ void BrowserScreen::HideKeyboard() {
 
 // ---- Panels ----------------------------------------------------------------
 
+// A panel is a box the size of the page area, holding content designed at 144 x 81
+// that is scaled to fill the box (SetDimensions). Returns the content.
 GameObject* BrowserScreen::MakePanel() {
-    auto panel = BSML::Lite::CreateVerticalLayoutGroup(pageImage->transform->parent);
-    panel->spacing = 1.0f;
-    panel->childForceExpandHeight = false;
-    panel->childControlHeight = true;
-    panel->childAlignment = TextAnchor::MiddleCenter;
-    auto size = panel->gameObject->GetComponent<UI::LayoutElement*>();
-    if (!size) size = panel->gameObject->AddComponent<UI::LayoutElement*>();
+    auto root = GameObject::New_ctor("QuestBrowserPanel");
+    root->transform->SetParent(pageImage->transform->parent, false);
+    root->AddComponent<RectTransform*>();
+    auto size = root->AddComponent<UI::LayoutElement*>();
     size->preferredWidth = 144.0f;
     size->preferredHeight = 81.0f;
-    panels.push_back(panel->gameObject);
+
+    auto content = BSML::Lite::CreateVerticalLayoutGroup(root->transform);
+    content->spacing = 1.0f;
+    content->childForceExpandHeight = false;
+    content->childControlHeight = true;
+    content->childAlignment = TextAnchor::MiddleCenter;
+    if (auto fitter = content->GetComponent<UI::ContentSizeFitter*>()) fitter->enabled = false;
+    auto rect = content->rectTransform;
+    rect->anchorMin = {0.5f, 0.5f};
+    rect->anchorMax = {0.5f, 0.5f};
+    rect->pivot = {0.5f, 0.5f};
+    rect->anchoredPosition = {0.0f, 0.0f};
+    rect->sizeDelta = {144.0f, 81.0f};
+
+    panels.push_back(root);
     panelSizes.push_back(size);
-    panel->gameObject->SetActive(false);
-    return panel->gameObject;
+    panelContents.push_back(rect);
+    root->SetActive(false);
+    return content->gameObject;
 }
 
 void BrowserScreen::ShowPanel(Panel panel) {

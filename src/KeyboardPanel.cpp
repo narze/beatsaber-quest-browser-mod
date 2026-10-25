@@ -13,7 +13,9 @@
 #include "UnityEngine/UI/LayoutElement.hpp"
 #include "bsml/shared/BSML-Lite.hpp"
 #include "bsml/shared/BSML/Components/Backgroundable.hpp"
+#include "UnityEngine/Camera.hpp"
 #include "main.hpp"
+#include "placement_logic.hpp"
 
 DEFINE_TYPE(QuestBrowser, KeyboardPanel);
 
@@ -31,6 +33,10 @@ constexpr float kFontSize = 3.6f;
 // Below the window, tilted toward the player like a laptop keyboard.
 constexpr float kGap = 9.0f;  // clears the move handle at the bottom edge of the window
 constexpr float kTiltDegrees = 30.0f;
+// Near the player: tilted back so that it faces the eyes, like a laptop keyboard,
+// at 0.45 cm per UI unit (about 68 cm wide).
+constexpr float kNearTiltDegrees = 50.0f;
+constexpr float kNearScale = 0.0045f;
 
 Color const kNormalText{1.0f, 1.0f, 1.0f, 1.0f};
 Color const kActiveText{0.25f, 0.85f, 1.0f, 1.0f};
@@ -85,7 +91,24 @@ KeyboardPanel* KeyboardPanel::Create(Transform* window, float windowHeight) {
     return panel;
 }
 
-void KeyboardPanel::LateUpdate() { FollowAnchor(); }
+void KeyboardPanel::LateUpdate() {
+    // Near the player it stays where it opened; it only follows the window as a fallback.
+    if (!placedNearUser) FollowAnchor();
+}
+
+// In front of the player, below the eyes, where it is large enough to type on.
+bool KeyboardPanel::PlaceNearUser() {
+    auto camera = Camera::get_main();
+    if (!camera) return false;
+    auto head = camera->transform;
+    auto p = head->position;
+    auto f = head->forward;
+    auto pose = Placement::KeyboardNearHead({p.x, p.y, p.z}, {f.x, f.y, f.z});
+    transform->position = Vector3(pose.position.x, pose.position.y, pose.position.z);
+    transform->rotation = Quaternion::Euler(kNearTiltDegrees, pose.yawDegrees, 0.0f);
+    transform->localScale = Vector3(kNearScale, kNearScale, kNearScale);
+    return true;
+}
 
 // Below the window, tilted toward the player, in the window's units and scale.
 void KeyboardPanel::FollowAnchor() {
@@ -144,8 +167,11 @@ void KeyboardPanel::Build(Vector2 size) {
 }
 
 void KeyboardPanel::SetVisible(bool visible) {
+    bool wasVisible = gameObject->activeSelf;
     gameObject->SetActive(visible);
     if (!visible) return;
+    // Place it when it opens, not on every key: it must not move while typing.
+    if (!wasVisible) placedNearUser = PlaceNearUser();
     auto rect = gameObject->GetComponent<RectTransform*>();
     auto pos = transform->position;
     auto scale = transform->lossyScale;

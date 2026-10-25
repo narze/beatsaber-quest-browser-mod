@@ -24,3 +24,31 @@ TEST_CASE("Reset pose clears the song selection screens at the default window si
     float bottom = BottomEdgeY(kResetPosition.y, height, kResetPitchDegrees) - toolbar;
     CHECK(bottom >= kSongSelectionTop);
 }
+
+TEST_CASE("KeyboardNearHead: in front of the player, below the eyes, level with the floor") {
+    // Head at 1.7 m looking along +z.
+    auto pose = KeyboardNearHead({0, 1.7f, 0}, {0, 0, 1});
+    CHECK(pose.position.x == doctest::Approx(0));
+    CHECK(pose.position.z == doctest::Approx(kKeyboardDistance));
+    CHECK(pose.position.y == doctest::Approx(1.7f - kKeyboardDrop));
+    CHECK(pose.yawDegrees == doctest::Approx(0));
+}
+
+TEST_CASE("KeyboardNearHead: looking down or up does not move the keyboard into the floor") {
+    auto down = KeyboardNearHead({0, 1.7f, 0}, {0, -0.8f, 0.6f});
+    CHECK(down.position.y == doctest::Approx(1.7f - kKeyboardDrop));
+    CHECK(down.position.z == doctest::Approx(kKeyboardDistance));
+}
+
+TEST_CASE("KeyboardNearHead: follows the direction the player faces") {
+    auto right = KeyboardNearHead({1, 1.5f, 2}, {1, 0, 0});
+    CHECK(right.position.x == doctest::Approx(1 + kKeyboardDistance));
+    CHECK(right.position.z == doctest::Approx(2));
+    CHECK(right.yawDegrees == doctest::Approx(90));
+}
+
+TEST_CASE("KeyboardNearHead: straight up or down keeps a forward direction") {
+    auto up = KeyboardNearHead({0, 1.7f, 0}, {0, 1, 0});
+    CHECK(std::isfinite(up.position.x));
+    CHECK(std::isfinite(up.position.z));
+}

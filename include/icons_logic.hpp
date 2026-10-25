@@ -10,7 +10,7 @@
 
 namespace QuestBrowser::Icons {
 
-enum class Kind { Back, Forward, Reload, Menu, Tabs };
+enum class Kind { Back, Forward, Reload, Menu, Tabs, CornerBracket, EdgeBar };
 
 namespace detail {
 
@@ -44,6 +44,12 @@ inline float Distance(Kind kind, float x, float y) {
         case Kind::Tabs:
             // A square outline; the toolbar writes the tab count inside it.
             return minSegs({{0.2f, 0.2f, 0.8f, 0.2f}, {0.8f, 0.2f, 0.8f, 0.8f}, {0.8f, 0.8f, 0.2f, 0.8f}, {0.2f, 0.8f, 0.2f, 0.2f}});
+        case Kind::CornerBracket:
+            // An L in the bottom-left corner; the grips turn it for the other corners.
+            return minSegs({{0.12f, 0.12f, 0.12f, 0.85f}, {0.12f, 0.12f, 0.85f, 0.12f}});
+        case Kind::EdgeBar:
+            // A short horizontal pill; the grips turn it for the left and right edges.
+            return minSegs({{0.22f, 0.5f, 0.78f, 0.5f}});
         case Kind::Reload: {
             // A circle with a gap at the top right, and an arrow head at the gap.
             float dx = x - 0.5f, dy = y - 0.5f;
@@ -65,7 +71,7 @@ inline float Distance(Kind kind, float x, float y) {
 
 // RGBA pixels (white, the shape in alpha), size x size, texture row 0 at the bottom.
 inline std::vector<uint8_t> Draw(Kind kind, int size) {
-    constexpr float kHalfStroke = 0.055f;
+    float kHalfStroke = kind == Kind::EdgeBar ? 0.1f : kind == Kind::CornerBracket ? 0.075f : 0.055f;
     std::vector<uint8_t> px(static_cast<std::size_t>(size) * size * 4, 0);
     for (int y = 0; y < size; y++) {
         for (int x = 0; x < size; x++) {
