@@ -178,9 +178,10 @@ inline ScreenState ScreenStateFor(Context context, bool userVisible, bool showIn
     return {visible, interactive, interactive, inSong ? PoseSlot::Song : PoseSlot::Menu};
 }
 
-// enabled: the "Enable browser" setting. A disabled browser is hidden everywhere.
-inline ScreenState ScreenStateFor(Context context, bool enabled, bool userVisible, bool showInSong) {
-    return ScreenStateFor(context, enabled && userVisible, showInSong);
+// One "Enable browser" switch replaced "Enable browser" and "Show browser".
+// Saved values, if any: the browser stays off if either switch was off.
+inline bool EnabledAfterMerge(std::optional<bool> enabled, std::optional<bool> oldVisible) {
+    return enabled.value_or(true) && oldVisible.value_or(true);
 }
 
 }  // namespace QuestBrowser::Logic

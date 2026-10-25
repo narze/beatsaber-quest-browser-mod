@@ -82,7 +82,7 @@ void EnsureCreated() {
 }
 
 void Apply() {
-    auto state = Logic::ScreenStateFor(context, Config::GetEnabled(), Config::GetVisible(), Config::GetShowInSong());
+    auto state = Logic::ScreenStateFor(context, Config::GetEnabled(), Config::GetShowInSong());
     if (!state.visible) {
         if (floatingScreen) floatingScreen->gameObject->SetActive(false);
         return;
@@ -124,11 +124,6 @@ void SetContext(Logic::Context value) {
 }
 
 }  // namespace
-
-void ToggleVisible() {
-    Config::SetVisible(!Config::GetVisible());
-    Apply();
-}
 
 void Refresh() { Apply(); }
 
@@ -179,7 +174,6 @@ void ResetPosition(Logic::PoseSlot slot) {
 }
 
 void ResetCurrentPosition() {
-    Config::SetVisible(true);
     ResetPosition(context == Logic::Context::Menu ? Logic::PoseSlot::Menu : Logic::PoseSlot::Song);
 }
 
