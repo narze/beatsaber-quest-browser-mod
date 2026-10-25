@@ -34,6 +34,8 @@ void SetShortcutEnabled(bool value);
 // One saved position and size for the menu and one for songs.
 Pose GetPose(Logic::PoseSlot slot);
 void SetPose(Logic::PoseSlot slot, Pose const& pose);
+// Back to the default position, size and aspect: centered, above the song selection.
+void ResetPose(Logic::PoseSlot slot);
 void ResetPoses();
 Resize::Dimensions GetDimensions(Logic::PoseSlot slot);
 void SetDimensions(Logic::PoseSlot slot, Resize::Dimensions size);

@@ -8,7 +8,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 
 1. Install `QuestBrowser.qmod` with [ModsBeforeFriday](https://mbf.bsquest.xyz/) or QuestPatcher. It installs BSML, custom-types, and beatsaber-hook too if they are missing.
 2. The browser is one floating window. It stays open in the menu and in songs, and the page does not reload between them.
-   - **Browser** in the mods list on the left of the main menu shows or hides it.
+   - **Browser** in the mods list on the left of the main menu opens the browser settings (also in Mod settings > **Browser**). The **Show browser** switch there shows or hides the window.
    - **Bring browser here** in the main menu mods list or Browser settings recovers a lost window 2.5 m in front of your current view, restores a readable size, and shows it without reloading the page. Only the current menu/song layout is reset.
    - Controller shortcut: hold the **left thumbstick click** for 0.6 s to do the same. It works in the menu and while paused, not while a song plays. Turn it off in Mod settings > **Browser**.
    - Menu: click the page, drag the handle below the window to move it, and drag a corner or edge grip to resize it. Edge grips change one dimension; corner grips change both independently in Free mode. Resizing stays centered on the window.
@@ -30,7 +30,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
    - **<**, **>**, **Reload**, **Home** work like in a desktop browser.
    - Fullscreen video fills the browser window. **<** or **Esc** leaves fullscreen.
-4. Mod settings > **Browser**: show the window during songs or not, and reset the positions and sizes.
+4. Browser settings: show the browser, show it during songs, the controller shortcut, **Bring browser here**, and **Reset menu position** / **Reset in-song position**. A reset puts that window back at its default size, centered and raised above the song selection.
 
 The page stops (timers, video, audio) while the window is hidden. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
 

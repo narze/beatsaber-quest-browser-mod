@@ -161,6 +161,14 @@ void CycleAspectPreset() {
 
 void OnSongEnded() { SetContext(Logic::Context::Menu); }
 
+void ResetPosition(Logic::PoseSlot slot) {
+    Config::ResetPose(slot);
+    // Place the window again now if it shows this slot.
+    if (placedFor == slot) placedFor.reset();
+    Apply();
+    logger.info("Reset browser position for {}", slot == Logic::PoseSlot::Menu ? "menu" : "songs");
+}
+
 void ResetPositions() {
     Config::ResetPoses();
     placedFor.reset();

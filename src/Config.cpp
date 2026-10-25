@@ -2,19 +2,22 @@
 
 #include "beatsaber-hook/shared/config/config-utils.hpp"
 #include "main.hpp"
+#include "placement_logic.hpp"
 
 namespace QuestBrowser::Config {
 
 namespace {
 
-// Songs: to the left of the track, turned to face the player (yaw -50 degrees).
-constexpr Pose kDefaultSongPose{{-2.6f, 1.6f, 2.4f}, {0.0f, -0.4226f, 0.0f, 0.9063f}, kDefaultScale};
-// Menu: above the main menu screens, tilted down to the player (pitch -25 degrees).
-constexpr Pose kDefaultMenuPose{{0.0f, 3.4f, 3.6f}, {-0.2164f, 0.0f, 0.0f, 0.9763f}, kDefaultScale};
+// Menu and songs: centered and raised above the song selection (and the note
+// track), tilted toward the player. See placement_logic.hpp.
+Pose ResetPoseValue() {
+    auto p = Placement::kResetPosition;
+    return {{p.x, p.y, p.z}, UnityEngine::Quaternion::Euler(Placement::kResetPitchDegrees, 0.0f, 0.0f), kDefaultScale};
+}
 
 // Song keys have no prefix, for compatibility with configs from 0.1.0.
 char const* Prefix(Logic::PoseSlot slot) { return slot == Logic::PoseSlot::Menu ? "menu" : ""; }
-Pose const& DefaultPose(Logic::PoseSlot slot) { return slot == Logic::PoseSlot::Menu ? kDefaultMenuPose : kDefaultSongPose; }
+Pose DefaultPose(Logic::PoseSlot) { return ResetPoseValue(); }
 
 std::string Key(Logic::PoseSlot slot, char const* name) {
     std::string key = std::string(Prefix(slot)) + name;
@@ -76,7 +79,7 @@ bool GetShortcutEnabled() { return GetBool("shortcut", true); }
 void SetShortcutEnabled(bool value) { SetBool("shortcut", value); }
 
 Pose GetPose(Logic::PoseSlot slot) {
-    auto const& d = DefaultPose(slot);
+    auto const d = DefaultPose(slot);
     auto f = [&](char const* name, float fallback) { return GetFloat(Key(slot, name), fallback); };
     return {
         {f("posX", d.position.x), f("posY", d.position.y), f("posZ", d.position.z)},
@@ -98,13 +101,15 @@ void SetPose(Logic::PoseSlot slot, Pose const& pose) {
     Get().Write();
 }
 
+void ResetPose(Logic::PoseSlot slot) {
+    SetPose(slot, DefaultPose(slot));
+    SetDimensions(slot, {});
+    SetAspectPreset(slot, 0);
+}
+
 void ResetPoses() {
-    SetPose(Logic::PoseSlot::Menu, kDefaultMenuPose);
-    SetPose(Logic::PoseSlot::Song, kDefaultSongPose);
-    SetDimensions(Logic::PoseSlot::Menu, {});
-    SetDimensions(Logic::PoseSlot::Song, {});
-    SetAspectPreset(Logic::PoseSlot::Menu, 0);
-    SetAspectPreset(Logic::PoseSlot::Song, 0);
+    ResetPose(Logic::PoseSlot::Menu);
+    ResetPose(Logic::PoseSlot::Song);
 }
 
 Resize::Dimensions GetDimensions(Logic::PoseSlot slot) {

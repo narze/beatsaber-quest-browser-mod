@@ -15,6 +15,8 @@ void ToggleVisible();
 void Refresh();
 // Settings: move the window back to the default positions.
 void ResetPositions();
+// Settings: move the menu or the in-song window back to its default position and size.
+void ResetPosition(Logic::PoseSlot slot);
 void BringHere();
 // Menu, song playing, or song paused.
 Logic::Context CurrentContext();
