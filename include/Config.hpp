@@ -27,9 +27,9 @@ void SetVisible(bool value);
 bool GetShowInSong();
 void SetShowInSong(bool value);
 
-// Hold the left thumbstick click to bring the browser in front of you.
-bool GetShortcutEnabled();
-void SetShortcutEnabled(bool value);
+// Name of the controller combo (keybind_logic.hpp) that resets the window position when held.
+std::string GetResetKeybind();
+void SetResetKeybind(std::string_view name);
 
 // One saved position and size for the menu and one for songs.
 Pose GetPose(Logic::PoseSlot slot);

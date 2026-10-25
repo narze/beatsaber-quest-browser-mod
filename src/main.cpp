@@ -3,6 +3,7 @@
 
 // Include dependency headers
 #include "Config.hpp"
+#include "keybind_logic.hpp"
 #include "BrowserWindow.hpp"
 #include "UnityEngine/Transform.hpp"
 #include "bsml/shared/BSML-Lite.hpp"
@@ -44,18 +45,18 @@ void BuildSettings(UnityEngine::Transform* parent) {
         Config::SetVisible(value);
         Window::Refresh();
     }));
-    BSML::Lite::CreateToggle(c, "Show browser during songs", Config::GetShowInSong(), [](bool value) {
+    BSML::Lite::CreateToggle(c, "Show during songs", Config::GetShowInSong(), [](bool value) {
         Config::SetShowInSong(value);
         Window::Refresh();
     });
-    BSML::Lite::CreateToggle(c, "Hold left thumbstick click: bring browser here", Config::GetShortcutEnabled(),
-                             [](bool value) { Config::SetShortcutEnabled(value); });
-    BSML::Lite::CreateText(c,
-                           "Move the window with the handle below it, and resize it with its edges and corners. "
-                           "The menu and songs each keep their own position and size. "
-                           "In a song, pause to click or move it.",
-                           3.5f);
-    BSML::Lite::CreateUIButton(c, "Bring browser here", Window::BringHere);
+
+    // Keep the names alive: the dropdown keeps the views.
+    static std::vector<std::string_view> names;
+    if (names.empty())
+        for (auto const& preset : QuestBrowser::Keybind::Presets()) names.push_back(preset.name);
+    BSML::Lite::CreateDropdown(c, "Reset keybind (hold)", Config::GetResetKeybind(), names,
+                               [](StringW value) { Config::SetResetKeybind(static_cast<std::string>(value)); });
+
     BSML::Lite::CreateUIButton(c, "Reset menu position", []() { Window::ResetPosition(PoseSlot::Menu); });
     BSML::Lite::CreateUIButton(c, "Reset in-song position", []() { Window::ResetPosition(PoseSlot::Song); });
 }
@@ -79,7 +80,6 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
 
     // "Browser" in the mods list on the left of the main menu opens the browser settings.
     BSML::Register::RegisterMainMenuViewControllerMethod("Browser", "Browser", "Browser settings", ShowSettings);
-    BSML::Register::RegisterMenuButton("Bring browser here", "Recover the browser in front of you", QuestBrowser::Window::BringHere);
 
     // The same page in Mod settings.
     BSML::Register::RegisterSettingsMenu("Browser", ShowSettings, false);

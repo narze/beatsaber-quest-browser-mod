@@ -127,29 +127,6 @@ void FitControls() {
                     Resize::AspectFor(GetAspectPreset()), GetControlScale(), GetChromeHeight()), false);
 }
 
-void BringHere() {
-    auto camera = Camera::get_main();
-    if (!camera) return;
-    Config::SetVisible(true);
-    Apply();
-    if (!floatingScreen || !placedFor) return;
-    auto head = camera->transform;
-    auto forward = head->forward;
-    auto position = head->position;
-    Config::Pose pose{{position.x + forward.x * 2.5f, position.y + forward.y * 2.5f,
-                       position.z + forward.z * 2.5f},
-                      Quaternion::LookRotation(forward, head->up), Config::kDefaultScale};
-    floatingScreen->transform->SetPositionAndRotation(pose.position, pose.rotation);
-    floatingScreen->transform->localScale = {pose.scale, pose.scale, pose.scale};
-    Config::SetPose(*placedFor, pose);
-    Config::SetAspectPreset(*placedFor, 0);
-    if (browserScreen) browserScreen->RefreshForPose();
-    ApplyDimensions({}, false);
-    FitControls();
-    auto rect = floatingScreen->GetComponent<RectTransform*>()->rect;
-    Config::SetDimensions(*placedFor, {rect.width, rect.height});
-}
-
 int GetAspectPreset() { return placedFor ? Config::GetAspectPreset(*placedFor) : 0; }
 void CycleAspectPreset() {
     if (!placedFor) return;
@@ -166,7 +143,16 @@ void ResetPosition(Logic::PoseSlot slot) {
     // Place the window again now if it shows this slot.
     if (placedFor == slot) placedFor.reset();
     Apply();
+    if (placedFor == slot && browserScreen) {
+        browserScreen->RefreshForPose();
+        FitControls();
+    }
     logger.info("Reset browser position for {}", slot == Logic::PoseSlot::Menu ? "menu" : "songs");
+}
+
+void ResetCurrentPosition() {
+    Config::SetVisible(true);
+    ResetPosition(context == Logic::Context::Menu ? Logic::PoseSlot::Menu : Logic::PoseSlot::Song);
 }
 
 void ResetPositions() {

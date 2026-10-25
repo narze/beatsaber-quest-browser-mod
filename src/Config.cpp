@@ -2,6 +2,7 @@
 
 #include "beatsaber-hook/shared/config/config-utils.hpp"
 #include "main.hpp"
+#include "keybind_logic.hpp"
 #include "placement_logic.hpp"
 
 namespace QuestBrowser::Config {
@@ -75,8 +76,20 @@ void SetVisible(bool value) { SetBool("visible", value); }
 bool GetShowInSong() { return GetBool("showInSong", true); }
 void SetShowInSong(bool value) { SetBool("showInSong", value); }
 
-bool GetShortcutEnabled() { return GetBool("shortcut", true); }
-void SetShortcutEnabled(bool value) { SetBool("shortcut", value); }
+std::string GetResetKeybind() {
+    auto it = Doc().FindMember("resetKeybind");
+    std::string name = it != Doc().MemberEnd() && it->value.IsString() ? it->value.GetString() : "";
+    return std::string(Keybind::Find(name).name);
+}
+
+void SetResetKeybind(std::string_view name) {
+    auto& doc = Doc();
+    rapidjson::Value value(std::string(Keybind::Find(name).name).c_str(), Alloc());
+    auto it = doc.FindMember("resetKeybind");
+    if (it != doc.MemberEnd()) it->value = value;
+    else doc.AddMember(rapidjson::Value("resetKeybind", Alloc()), value, Alloc());
+    Get().Write();
+}
 
 Pose GetPose(Logic::PoseSlot slot) {
     auto const d = DefaultPose(slot);

@@ -17,7 +17,8 @@ void Refresh();
 void ResetPositions();
 // Settings: move the menu or the in-song window back to its default position and size.
 void ResetPosition(Logic::PoseSlot slot);
-void BringHere();
+// Keybind: show the window and reset the position of the current context (menu or song).
+void ResetCurrentPosition();
 // Menu, song playing, or song paused.
 Logic::Context CurrentContext();
 void FitControls();
