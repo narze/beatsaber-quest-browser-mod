@@ -150,6 +150,24 @@ for want in "TABS_RESTORED count=2 active=1 titles=|tab two" \
     grep -qF "$want" "$OUT/logcat-tabs.txt" || { echo "FAIL: expected '$want'"; tabs=1; }
 done
 
+echo "== Map install test (needs internet: BeatSaver map 1a2b)"
+adb logcat -c
+adb shell am force-stop "$PKG"
+adb shell am start -n "$PKG/.HarnessActivity" --es mode songs >/dev/null
+songs=0
+for _ in $(seq 1 120); do
+    if adb logcat -d -s QBHarness:* | grep -q "SONGS_DONE"; then break; fi
+    sleep 0.5
+done
+adb logcat -d -s QBHarness:* QuestBrowser:* | tee "$OUT/logcat-songs.txt" | grep -E "SONGS_|map"
+for want in "SONGS_URL_AFTER_ONECLICK file:///android_asset/songs.html" "SONGS_INSTALLED 1" \
+            "SONGS_FOLDER 1a2b (Believer RU Cover - BCPowerhouse) files=" \
+            "SONGS_STATUS Already installed: Believer RU Cover" "SONGS_INSTALLED_AGAIN 0" "SONGS_DONE"; do
+    grep -qF "$want" "$OUT/logcat-songs.txt" || { echo "FAIL: expected '$want'"; songs=1; }
+done
+adb shell ls "$DIR/CustomLevels/1a2b\ \(Believer\ RU\ Cover\ -\ BCPowerhouse\)/" | grep -qi "^info.dat$" \
+    || { echo "FAIL: installed map has no Info.dat"; songs=1; }
+
 echo "== Check"
 fail=0
 grep -q "FAIL" "$OUT/logcat.txt" && { echo "FAIL: harness reported a failure"; fail=1; }
@@ -163,5 +181,6 @@ echo "Frames: $OUT/frame1.png $OUT/frame2.png"
 [ $http -eq 0 ] || fail=1
 [ $vp -eq 0 ] || fail=1
 [ $tabs -eq 0 ] || fail=1
+[ $songs -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "PASS"
 exit $fail
