@@ -166,3 +166,14 @@ TEST_CASE("history revisits move to front and oldest visits are bounded") {
     QuestBrowser::Logic::RememberUrl(urls, "");
     CHECK(urls.size() == 100);
 }
+
+TEST_CASE("EnabledAfterMerge: one switch replaces Enable browser and Show browser") {
+    // Nothing saved: on.
+    CHECK(EnabledAfterMerge(std::nullopt, std::nullopt));
+    // Someone who hid the window with the old Show browser switch stays hidden.
+    CHECK_FALSE(EnabledAfterMerge(std::nullopt, false));
+    CHECK_FALSE(EnabledAfterMerge(true, false));
+    // A disabled browser stays disabled.
+    CHECK_FALSE(EnabledAfterMerge(false, true));
+    CHECK(EnabledAfterMerge(true, true));
+}

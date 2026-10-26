@@ -20,9 +20,10 @@ struct Pose {
 
 void Load();
 
-// The menu button shows or hides the browser window.
-bool GetVisible();
-void SetVisible(bool value);
+// The "Enable browser" switch. Off: no window, toolbar, keyboard or keybind; off at
+// start, the web view is not created at all.
+bool GetEnabled();
+void SetEnabled(bool value);
 
 bool GetShowInSong();
 void SetShowInSong(bool value);

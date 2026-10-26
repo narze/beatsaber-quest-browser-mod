@@ -10,15 +10,13 @@
 namespace QuestBrowser::Window {
 
 void InstallHooks();
-// Menu button: show or hide the window.
-void ToggleVisible();
 // Settings: apply changed settings, for example "show during songs".
 void Refresh();
 // Settings: move the window back to the default positions.
 void ResetPositions();
 // Settings: move the menu or the in-song window back to its default position and size.
 void ResetPosition(Logic::PoseSlot slot);
-// Keybind: show the window and reset the position of the current context (menu or song).
+// Keybind: reset the position of the current context (menu or song).
 void ResetCurrentPosition();
 // While the player holds the move handle of `screen`, the thumbstick pushes or pulls
 // it faster than BSML alone. Call every frame.

@@ -68,6 +68,14 @@ void SetBool(char const* key, bool value) {
 void Load() {
     Get().Load();
     if (!Doc().IsObject()) Doc().SetObject();
+    // "Show browser" merged into "Enable browser": keep the browser off if either was off.
+    if (auto it = Doc().FindMember("visible"); it != Doc().MemberEnd()) {
+        std::optional<bool> enabled, visible;
+        if (it->value.IsBool()) visible = it->value.GetBool();
+        if (auto e = Doc().FindMember("enabled"); e != Doc().MemberEnd() && e->value.IsBool()) enabled = e->value.GetBool();
+        Doc().RemoveMember("visible");
+        SetBool("enabled", Logic::EnabledAfterMerge(enabled, visible));
+    }
     // Layout 2: the toolbar left the window, so saved heights lose the old toolbar rows.
     if (GetFloat("layoutVersion", 1) < 2) {
         for (auto slot : {Logic::PoseSlot::Menu, Logic::PoseSlot::Song}) {
@@ -79,8 +87,8 @@ void Load() {
     }
 }
 
-bool GetVisible() { return GetBool("visible", true); }
-void SetVisible(bool value) { SetBool("visible", value); }
+bool GetEnabled() { return GetBool("enabled", true); }
+void SetEnabled(bool value) { SetBool("enabled", value); }
 
 bool GetShowInSong() { return GetBool("showInSong", true); }
 void SetShowInSong(bool value) { SetBool("showInSong", value); }

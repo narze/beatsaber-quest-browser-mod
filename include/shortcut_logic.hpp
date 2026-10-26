@@ -15,6 +15,11 @@ inline bool ShortcutAllowed(Logic::Context context, bool enabledInSettings) {
     return enabledInSettings && context != Logic::Context::SongPlaying;
 }
 
+// browserEnabled: the "Enable browser" setting. Nothing to reset while it is off.
+inline bool ShortcutAllowed(Logic::Context context, bool enabledInSettings, bool browserEnabled) {
+    return browserEnabled && ShortcutAllowed(context, enabledInSettings);
+}
+
 // Fires once when a button is held for holdSeconds. It fires again only after a release.
 // A hold that starts while not allowed must be released before it can fire.
 class HoldDetector {

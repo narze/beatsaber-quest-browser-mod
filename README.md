@@ -8,7 +8,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 
 1. Install `QuestBrowser.qmod` with [ModsBeforeFriday](https://mbf.bsquest.xyz/) or QuestPatcher. It installs BSML, custom-types, and beatsaber-hook too if they are missing.
 2. The browser is one floating window. It stays open in the menu and in songs, and the page does not reload between them.
-   - **Browser** in the mods list on the left of the main menu opens the browser settings (also in Mod settings > **Browser**). The **Show browser** switch there shows or hides the window.
+   - **Browser** in the mods list on the left of the main menu opens the browser settings (also in Mod settings > **Browser**). The **Enable browser** switch there turns the browser on or off.
    - Lost the window? Hold the **reset keybind** (default **X + Y**) for 0.6 s. The window shows again at its default size, centered and raised above the song selection. It works in the menu and while paused, not while a song plays. Choose the combo, or Off, in the Browser settings.
    - Menu: click the page, drag the handle above the window to move it (while you hold it, push the thumbstick up or down to move it away or closer), and drag its corners and edges to resize it.
    - Song: the page shows, but you can not click it. Pause to click, move, or resize it.
@@ -30,7 +30,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - **Zoom - / +** adjusts page zoom from 50% to 200%, without changing the window. Pages reflow to the new viewport. The keyboard follows the resized window. Minimum dimensions keep the toolbar and history usable.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
    - Tabs come back at the next start. Only the open tab loads; the others load when you open them.
-4. Browser settings: show the browser, show it during songs, the reset keybind (Off, X + Y, A + B, X + A, Y + B, left, right, or both stick clicks), and **Reset menu position** / **Reset in-song position**. A reset puts that window back at its default size, centered and raised above the song selection.
+4. Browser settings: **Enable browser** (on by default; off hides the window, the toolbar and the keyboard, turns off the keybind, and from the next start the browser does not load at all), show it during songs, the reset keybind (Off, X + Y, A + B, X + A, Y + B, left, right, or both stick clicks), and **Reset menu position** / **Reset in-song position**. A reset puts that window back at its default size, centered and raised above the song selection.
 
 The page stops (timers, video, audio) while the window is hidden. While a song plays, only the page shows; pause to see the controls. The move handle is above the window. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
 
