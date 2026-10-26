@@ -28,6 +28,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -224,7 +225,17 @@ public final class BrowserBridge {
         // Links with target=_blank open in this tab.
         s.setSupportMultipleWindows(false);
 
+        // Map downloads (BeatSaver, BeatLeader) install into the song list.
+        view.setDownloadListener((url, userAgent, contentDisposition, mimeType, length) -> {
+            if (!SongInstaller.offer(url)) SongInstaller.rejectDownload(url);
+        });
         view.setWebViewClient(new WebViewClient() {
+            // One-Click buttons (beatsaver://<key>) install the map instead of navigating.
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) {
+                return SongInstaller.offer(request.getUrl().toString());
+            }
+
             @Override
             public void onPageStarted(WebView v, String url, Bitmap favicon) {
                 tab.url = url;
@@ -372,6 +383,21 @@ public final class BrowserBridge {
 
     public static int getActiveTab() {
         return activeTabIndex;
+    }
+
+    /** Where maps are installed: the SongCore custom levels folder. */
+    public static void setSongsDir(String dir) {
+        SongInstaller.setSongsDir(dir);
+    }
+
+    /** Map download status for the toolbar, or "" when there is nothing to show. */
+    public static String getSongStatus() {
+        return SongInstaller.status();
+    }
+
+    /** Maps installed since the last call. */
+    public static int takeSongsInstalled() {
+        return SongInstaller.takeInstalled();
     }
 
     private static void createUrlField(Context ctx) {
