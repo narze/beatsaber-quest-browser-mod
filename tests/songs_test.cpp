@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include "browser_logic.hpp"
 #include "songs_logic.hpp"
 
 using namespace QuestBrowser::Songs;
@@ -35,4 +36,19 @@ TEST_CASE("RefreshGate: zero or negative counts do not cause a reload") {
     gate.Installed(0);
     gate.Installed(-1);
     CHECK_FALSE(gate.Take(true, false));
+}
+
+TEST_CASE("MapSites: the sites in the menu, in order") {
+    REQUIRE(kMapSites.size() == 3);
+    CHECK(kMapSites[0].name == "BeatSaver");
+    CHECK(kMapSites[1].name == "BeastSaber");
+    CHECK(kMapSites[2].name == "BeatLeader");
+}
+
+TEST_CASE("MapSites: each URL is https and loads as is") {
+    for (auto const& site : kMapSites) {
+        CAPTURE(site.name);
+        CHECK(site.url.starts_with("https://"));
+        CHECK(QuestBrowser::Logic::NormalizeUrl(site.url) == site.url);
+    }
 }
