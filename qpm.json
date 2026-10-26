@@ -80,6 +80,11 @@
       "id": "custom-types",
       "versionRange": "^0.18.4",
       "additionalData": {}
+    },
+    {
+      "id": "songcore",
+      "versionRange": "^1.1.26",
+      "additionalData": {}
     }
   ]
 }
