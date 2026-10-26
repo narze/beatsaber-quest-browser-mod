@@ -14,6 +14,7 @@
 #include "ToolbarPanel.hpp"
 #include "browser_logic.hpp"
 #include "resize_logic.hpp"
+#include "songs_logic.hpp"
 #include "tabs_logic.hpp"
 #include "custom-types/shared/macros.hpp"
 
@@ -114,6 +115,10 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     UnityW<TMPro::TextMeshProUGUI> tabsStatus;
     UnityW<UnityEngine::UI::Button> newTabButton;
     void CloseTab(int index);
+
+    // Map downloads: status for the toolbar ("" when none), and the SongCore reload.
+    std::string songStatus;
+    Songs::RefreshGate songRefresh;
 
     bool ready = false;
     bool interactive = true;

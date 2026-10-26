@@ -33,6 +33,7 @@ struct Methods {
     jmethodID setViewport;
     jmethodID sendText, sendKey, beginUrlEditing, cancelUrlEditing, takeKeyboardRequest, getUrlDraft, takeSubmittedUrl;
     jmethodID getUrl, getTitle, getProgress;
+    jmethodID setSongsDir, getSongStatus, takeSongsInstalled;
     jmethodID acquireFrame, releaseFrame;
 };
 
@@ -171,6 +172,9 @@ bool LookupMethods(JNIEnv* env) {
            get(m.getUrl, "getUrl", "()Ljava/lang/String;") &&
            get(m.getTitle, "getTitle", "()Ljava/lang/String;") &&
            get(m.getProgress, "getProgress", "()I") &&
+           get(m.setSongsDir, "setSongsDir", "(Ljava/lang/String;)V") &&
+           get(m.getSongStatus, "getSongStatus", "()Ljava/lang/String;") &&
+           get(m.takeSongsInstalled, "takeSongsInstalled", "()I") &&
            get(m.acquireFrame, "acquireFrame", "()Ljava/nio/ByteBuffer;") &&
            get(m.releaseFrame, "releaseFrame", "()V");
 }
@@ -321,6 +325,10 @@ std::optional<std::string> TakeSubmittedUrl() { return CallOptionalString("takeS
 
 std::string GetUrl() { return CallString("getUrl", m.getUrl); }
 std::string GetTitle() { return CallString("getTitle", m.getTitle); }
+
+void SetSongsDir(std::string_view dir) { CallWithString("setSongsDir", m.setSongsDir, dir); }
+std::string GetSongStatus() { return CallString("getSongStatus", m.getSongStatus); }
+int TakeSongsInstalled() { return CallInt("takeSongsInstalled", m.takeSongsInstalled); }
 
 int GetProgress() {
     if (!ready) return 0;

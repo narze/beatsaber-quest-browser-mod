@@ -50,6 +50,13 @@ std::optional<std::string> GetUrlDraft();
 // The address submitted with Enter, once.
 std::optional<std::string> TakeSubmittedUrl();
 
+// Maps from BeatSaver One-Click links and downloads install into dir (SongCore custom levels).
+void SetSongsDir(std::string_view dir);
+// Map download status for the toolbar, or "" when there is nothing to show.
+std::string GetSongStatus();
+// Maps installed since the last call.
+int TakeSongsInstalled();
+
 std::string GetUrl();
 std::string GetTitle();
 int GetProgress();
