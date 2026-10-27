@@ -2,6 +2,7 @@
 
 #include "UnityEngine/Quaternion.hpp"
 #include "UnityEngine/Vector3.hpp"
+#include "bookmarks_logic.hpp"
 #include "browser_logic.hpp"
 #include "history_logic.hpp"
 #include "resize_logic.hpp"
@@ -63,5 +64,7 @@ int GetActiveTab();
 void SetTabs(std::vector<std::string> const& urls, int active);
 std::vector<std::string> GetHistory();
 void SetHistory(std::vector<std::string> const& urls);
+std::vector<Bookmarks::Bookmark> GetBookmarks();
+void SetBookmarks(std::vector<Bookmarks::Bookmark> const& bookmarks);
 
 }  // namespace QuestBrowser::Config

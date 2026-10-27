@@ -243,4 +243,36 @@ void SetHistory(std::vector<std::string> const& urls) {
     Get().Write();
 }
 
+// [{"url": ..., "title": ...}, ...]
+std::vector<Bookmarks::Bookmark> GetBookmarks() {
+    std::vector<Bookmarks::Bookmark> out;
+    auto it = Doc().FindMember("bookmarks");
+    if (it == Doc().MemberEnd() || !it->value.IsArray()) return out;
+    for (auto const& entry : it->value.GetArray()) {
+        if (!entry.IsObject() || out.size() >= Bookmarks::kMax) continue;
+        auto url = entry.FindMember("url");
+        if (url == entry.MemberEnd() || !url->value.IsString()) continue;
+        auto title = entry.FindMember("title");
+        out.push_back({std::string(url->value.GetString(), url->value.GetStringLength()),
+                       title != entry.MemberEnd() && title->value.IsString()
+                           ? std::string(title->value.GetString(), title->value.GetStringLength())
+                           : std::string()});
+    }
+    return out;
+}
+
+void SetBookmarks(std::vector<Bookmarks::Bookmark> const& bookmarks) {
+    rapidjson::Value entries(rapidjson::kArrayType);
+    for (auto const& b : bookmarks) {
+        rapidjson::Value entry(rapidjson::kObjectType);
+        entry.AddMember("url", rapidjson::Value(b.url.c_str(), Alloc()), Alloc());
+        entry.AddMember("title", rapidjson::Value(b.title.c_str(), Alloc()), Alloc());
+        entries.PushBack(entry, Alloc());
+    }
+    auto it = Doc().FindMember("bookmarks");
+    if (it == Doc().MemberEnd()) Doc().AddMember(rapidjson::Value("bookmarks", Alloc()), entries, Alloc());
+    else it->value = entries;
+    Get().Write();
+}
+
 }  // namespace QuestBrowser::Config

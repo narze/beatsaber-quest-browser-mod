@@ -114,11 +114,13 @@ BrowserScreen* BrowserScreen::CreateIn(Transform* parent) {
     if (!screen->canvasGroup) screen->canvasGroup = go->AddComponent<CanvasGroup*>();
     BSML::parse_and_construct(kLayout, parent, screen);
     screen->history = Config::GetHistory();
+    screen->bookmarks = Config::GetBookmarks();
     screen->canvasGroup->alpha = Config::GetOpacity(Window::CurrentSlot());
-    // Order of creation follows the Panel enum: Tabs, Menu, History.
+    // Order of creation follows the Panel enum: Tabs, Menu, History, Bookmarks.
     screen->BuildTabs();
     screen->BuildMenu();
     screen->BuildHistory();
+    screen->BuildBookmarks();
     auto parentRect = parent->GetComponent<RectTransform*>();
     screen->keyboard = KeyboardPanel::Create(parent, parentRect ? parentRect->rect.height : 87.0f);
     screen->toolbar = ToolbarPanel::Create(parent, screen->keyboard.ptr(), screen->MakeToolbarActions());
@@ -483,6 +485,7 @@ void BrowserScreen::ShowPanel(Panel panel) {
     if (panel == Panel::Tabs) RefreshTabs();
     if (panel == Panel::Menu) RefreshMenu();
     if (panel == Panel::History) RefreshHistory();
+    if (panel == Panel::Bookmarks) RefreshBookmarks();
 }
 
 void BrowserScreen::BuildMenu() {
@@ -495,6 +498,7 @@ void BrowserScreen::BuildMenu() {
         Jni::LoadUrl(Logic::kHomeUrl);
     });
     Button(nav->transform, "History", 33.0f, [this]() { ShowPanel(Panel::History); });
+    Button(nav->transform, "Bookmarks", 33.0f, [this]() { ShowPanel(Panel::Bookmarks); });
     Button(nav->transform, "Keyboard", 33.0f, [this]() {
         ShowPanel(Panel::None);
         ToggleKeyboard();
@@ -585,6 +589,62 @@ void BrowserScreen::RefreshHistory() {
         historyOpenButtons[row]->gameObject->SetActive(exists);
         historyDeleteButtons[row]->gameObject->SetActive(exists);
         if (historyLabels[row]) historyLabels[row]->text = exists ? history[index] : "";
+    }
+}
+
+// ---- Bookmarks -------------------------------------------------------------
+
+void BrowserScreen::BuildBookmarks() {
+    auto panel = MakePanel()->transform;
+    bookmarksStatus = Label(panel, "Bookmarks", 120.0f);
+    for (std::size_t row = 0; row < kRows; ++row) {
+        auto line = Row(panel);
+        auto open = Button(line->transform, "", 108.0f, [this, row]() {
+            auto index = bookmarksPage * kRows + row;
+            if (index >= bookmarks.size()) return;
+            auto url = bookmarks[index].url;
+            ShowPanel(Panel::None);
+            Jni::LoadUrl(url);
+        });
+        bookmarkLabels.push_back(open->GetComponentInChildren<TMPro::TextMeshProUGUI*>());
+        bookmarkOpenButtons.push_back(open);
+        bookmarkDeleteButtons.push_back(Button(line->transform, "Delete", 26.0f, [this, row]() {
+            auto index = bookmarksPage * kRows + row;
+            if (index >= bookmarks.size()) return;
+            bookmarks.erase(bookmarks.begin() + index);
+            Config::SetBookmarks(bookmarks);
+            RefreshBookmarks();
+        }));
+    }
+    auto controls = Row(panel);
+    Button(controls->transform, "Add this page", 34.0f, [this]() {
+        Bookmarks::Add(bookmarks, Jni::GetUrl(), Jni::GetTitle());
+        Config::SetBookmarks(bookmarks);
+        bookmarksPage = 0;
+        RefreshBookmarks();
+    });
+    Button(controls->transform, "Newer", 30.0f, [this]() {
+        if (bookmarksPage) --bookmarksPage;
+        RefreshBookmarks();
+    });
+    Button(controls->transform, "Older", 30.0f, [this]() {
+        if ((bookmarksPage + 1) * kRows < bookmarks.size()) ++bookmarksPage;
+        RefreshBookmarks();
+    });
+    Button(controls->transform, "Close", 30.0f, [this]() { ShowPanel(Panel::None); });
+}
+
+void BrowserScreen::RefreshBookmarks() {
+    bookmarksPage = std::min(bookmarksPage, bookmarks.empty() ? std::size_t(0) : (bookmarks.size() - 1) / kRows);
+    if (bookmarksStatus)
+        bookmarksStatus->text = bookmarks.empty() ? "No bookmarks"
+                                                  : fmt::format("Bookmarks  {}/{}", bookmarksPage + 1, (bookmarks.size() + kRows - 1) / kRows);
+    for (std::size_t row = 0; row < bookmarkLabels.size(); ++row) {
+        auto index = bookmarksPage * kRows + row;
+        bool exists = index < bookmarks.size();
+        bookmarkOpenButtons[row]->gameObject->SetActive(exists);
+        bookmarkDeleteButtons[row]->gameObject->SetActive(exists);
+        if (bookmarkLabels[row]) bookmarkLabels[row]->text = exists ? Bookmarks::Label(bookmarks[index]) : "";
     }
 }
 

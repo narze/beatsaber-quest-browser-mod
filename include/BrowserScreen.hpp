@@ -12,6 +12,7 @@
 #include "VRUIControls/VRPointer.hpp"
 #include "KeyboardPanel.hpp"
 #include "ToolbarPanel.hpp"
+#include "bookmarks_logic.hpp"
 #include "browser_logic.hpp"
 #include "resize_logic.hpp"
 #include "songs_logic.hpp"
@@ -55,7 +56,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     QuestBrowser::Resize::Dimensions GetDimensions() const { return dimensions; }
 
    private:
-    enum class Panel { None, Tabs, Menu, History };
+    enum class Panel { None, Tabs, Menu, History, Bookmarks };
 
     void Setup();
     ToolbarActions MakeToolbarActions();
@@ -77,6 +78,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     void RefreshMenu();
     void BuildHistory();
     void RefreshHistory();
+    void BuildBookmarks();
+    void RefreshBookmarks();
     void BuildTabs();
     void RefreshTabs();
     Panel openPanel = Panel::None;
@@ -103,6 +106,14 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     UnityW<TMPro::TextMeshProUGUI> historyStatus;
     std::size_t historyPage = 0;
     std::string lastHistoryUrl;
+
+    // Bookmarks panel.
+    std::vector<Bookmarks::Bookmark> bookmarks;
+    std::vector<UnityW<TMPro::TextMeshProUGUI>> bookmarkLabels;
+    std::vector<UnityW<UnityEngine::UI::Button>> bookmarkOpenButtons;
+    std::vector<UnityW<UnityEngine::UI::Button>> bookmarkDeleteButtons;
+    UnityW<TMPro::TextMeshProUGUI> bookmarksStatus;
+    std::size_t bookmarksPage = 0;
 
     // Tabs panel, and the tab list read from the Java side.
     void UpdateTabs();
