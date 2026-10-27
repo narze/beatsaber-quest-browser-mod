@@ -10,25 +10,26 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 2. The browser is one floating window. It stays open in the menu and in songs, and the page does not reload between them.
    - **Browser** in the mods list on the left of the main menu opens the browser settings (also in Mod settings > **Browser**). The **Enable browser** switch there turns the browser on or off.
    - Lost the window? Hold the **reset keybind** (default **X + Y**) for 0.6 s. The window shows again at its default size, centered and raised above the song selection. It works in the menu and while paused, not while a song plays. Choose the combo, or Off, in the Browser settings.
-   - Menu: click the page, drag the handle above the window to move it (while you hold it, push the thumbstick up or down to move it away or closer), and drag its corners and edges to resize it.
+   - Menu: click the page, drag the handle above the window to move it (while you hold it, push the thumbstick up or down to move it away or closer), and drag its corners and edges to resize it. You can also point at the window or its toolbar and hold the **grip** button: the window follows your hand until you release the grip, and that thumbstick moves it away or closer.
    - Song: the page shows, but you can not click it. Pause to click, move, or resize it.
    - The menu and songs each keep their own window position and size.
 3. Controls:
    - The window shows only the page. Point at it and a slim toolbar fades in below it: **back**, **forward**, **reload**, the page title (click it to type an address or a search), **tabs** (with the number of tabs), and **menu**.
    - **Tabs** lists your tabs: open one, close one with **x**, or **+ New tab** (opens the keyboard). Up to 10 tabs; background tabs are paused. Tabs come back at the next start, and each loads when you open it.
-   - **Menu**: Home, History, Keyboard, quick links to the map sites (BeatSaver, BeastSaber, BeatLeader), Zoom, Opacity, and the window shape. Panel text grows with the window, and panels are fully opaque.
+   - **Menu**: Home, History, Bookmarks, Keyboard, quick links to the map sites (BeatSaver, BeastSaber, BeatLeader), Zoom, Opacity, and the window shape. Panel text grows with the window, and panels are fully opaque.
    - Resize with the brackets on the corners and the bars on the edges; they turn blue when you point at them.
    - Tap a text field on the page to open the keyboard. It opens near you (50 cm in front, 45 cm below your eyes, tilted like a laptop keyboard) and stays there while you type. Drag its handle to move it; it opens there, relative to where you face, next time. **Reset keyboard position** in the settings brings it back. Fullscreen video fills the window; back or **Esc** leaves fullscreen.
    - Back, Forward, URL, and **Menu** stay visible. **Menu > Browse** contains Reload, Home, Keyboard, and History. **Menu > View** contains aspect, zoom, and opacity controls (**Fade - / +**). Close Menu to give the page more room.
    - Buttons and labels grow with distance. The minimum window size fits the controls; there is no maximum window width or height.
    - Point at the page and pull the trigger to click. Hold the trigger and move to drag.
-   - Move the thumbstick up or down to scroll the page under the pointer.
+   - With the laser on the page, move the right thumbstick up or down to scroll the page under the pointer, and the left thumbstick up or down to zoom in or out (10% steps; the toolbar shows the new zoom).
+   - **Bookmarks** lists saved pages: open one, delete one, or **Add this page** to save the open page on top.
    - Clicking outside both the browser window and keyboard also closes the keyboard.
    - **History** opens up to 100 recent URLs, newest first. Click a URL to revisit it, **Delete** to remove one, or **Clear all** to erase the list. **Newer** and **Older** switch pages. History stays saved across restarts; recording starts with this version.
-   - **Opacity - / +** adjusts the window from 20% to 100% in 10% steps. The setting stays saved across restarts.
+   - **Opacity - / +** adjusts the window from 20% to 100% in 10% steps. The menu and songs each keep their own opacity (for example 100% in the menu and 70% in songs); the buttons change the one in use. The setting stays saved across restarts.
    - **Aspect** cycles Free, 16:9, 4:3, and Portrait (9:16). Presets constrain the page area, excluding the toolbar; select Free to unlock the ratio again. Width, height, and preset save separately for menus and songs.
    - **Zoom - / +** adjusts page zoom from 50% to 200%, without changing the window. Pages reflow to the new viewport. The keyboard follows the resized window. Minimum dimensions keep the toolbar and history usable.
-   - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
+   - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `http://`, `https://`, `.com`, Del, and Enter. A click in the gaps between keys does not close it.
    - Tabs come back at the next start. Only the open tab loads; the others load when you open them.
    - **Install maps**: on BeatSaver or BeastSaber, click **One-Click**; on BeatSaver or BeatLeader, click the map **Download** button. The map installs into your custom songs (`<key> (<song> - <mapper>)`), and the toolbar shows the progress. The song list reloads when you are in the menu; maps from the pause menu show up after the song. A map that is already installed is not downloaded again. Other downloads are not supported.
    - **Install playlists**: on a BeatSaver or BeastSaber playlist, click **One-Click** or **Download**. The playlist is saved into the PlaylistManager playlists folder, and its maps install one by one. The song list and the playlists reload once, when all the maps are installed.
