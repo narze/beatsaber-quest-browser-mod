@@ -390,12 +390,17 @@ public final class BrowserBridge {
         SongInstaller.setSongsDir(dir);
     }
 
+    /** Where playlists are saved: the PlaylistManager playlists folder. */
+    public static void setPlaylistsDir(String dir) {
+        SongInstaller.setPlaylistsDir(dir);
+    }
+
     /** Map download status for the toolbar, or "" when there is nothing to show. */
     public static String getSongStatus() {
         return SongInstaller.status();
     }
 
-    /** Maps installed since the last call. */
+    /** Maps and playlists installed since the last call. */
     public static int takeSongsInstalled() {
         return SongInstaller.takeInstalled();
     }
