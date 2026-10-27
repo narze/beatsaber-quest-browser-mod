@@ -114,7 +114,7 @@ BrowserScreen* BrowserScreen::CreateIn(Transform* parent) {
     if (!screen->canvasGroup) screen->canvasGroup = go->AddComponent<CanvasGroup*>();
     BSML::parse_and_construct(kLayout, parent, screen);
     screen->history = Config::GetHistory();
-    screen->canvasGroup->alpha = Config::GetOpacity();
+    screen->canvasGroup->alpha = Config::GetOpacity(Window::CurrentSlot());
     // Order of creation follows the Panel enum: Tabs, Menu, History.
     screen->BuildTabs();
     screen->BuildMenu();
@@ -289,9 +289,10 @@ void BrowserScreen::ChangeZoom(float delta) {
 }
 
 void BrowserScreen::ChangeOpacity(float delta) {
-    if (delta != 0.0f) Config::SetOpacity(Config::GetOpacity() + delta);
+    auto slot = Window::CurrentSlot();
+    if (delta != 0.0f) Config::SetOpacity(slot, Config::GetOpacity(slot) + delta);
     // While a panel is open the window stays opaque; the new opacity applies when it closes.
-    if (canvasGroup) canvasGroup->alpha = openPanel == Panel::None ? Config::GetOpacity() : 1.0f;
+    if (canvasGroup) canvasGroup->alpha = openPanel == Panel::None ? Config::GetOpacity(slot) : 1.0f;
     RefreshMenu();
 }
 
@@ -478,7 +479,7 @@ void BrowserScreen::ShowPanel(Panel panel) {
         if (panels[i]) panels[i]->SetActive(static_cast<int>(panel) == static_cast<int>(i) + 1);
     if (pageImage) pageImage->gameObject->SetActive(panel == Panel::None);
     // Panels are fully opaque, so they are easy to read; the page uses the opacity setting.
-    if (canvasGroup) canvasGroup->alpha = panel == Panel::None ? Config::GetOpacity() : 1.0f;
+    if (canvasGroup) canvasGroup->alpha = panel == Panel::None ? Config::GetOpacity(Window::CurrentSlot()) : 1.0f;
     if (panel == Panel::Tabs) RefreshTabs();
     if (panel == Panel::Menu) RefreshMenu();
     if (panel == Panel::History) RefreshHistory();
@@ -530,7 +531,7 @@ void BrowserScreen::BuildMenu() {
 void BrowserScreen::RefreshMenu() {
     constexpr char const* names[] = {"Free", "16:9", "4:3", "Portrait"};
     if (zoomText) zoomText->text = fmt::format("Zoom {}%", static_cast<int>(Config::GetZoom() * 100 + 0.5f));
-    if (opacityText) opacityText->text = fmt::format("Opacity {}%", static_cast<int>(Config::GetOpacity() * 100 + 0.5f));
+    if (opacityText) opacityText->text = fmt::format("Opacity {}%", static_cast<int>(Config::GetOpacity(Window::CurrentSlot()) * 100 + 0.5f));
     if (aspectText) aspectText->text = fmt::format("Shape: {}", names[std::clamp(Window::GetAspectPreset(), 0, 3)]);
 }
 

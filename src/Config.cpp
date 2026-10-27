@@ -156,9 +156,13 @@ void SetAspectPreset(Logic::PoseSlot slot, int preset) { SetFloat(Key(slot, "asp
 float GetZoom() { return std::clamp(GetFloat("zoom", 1), 0.5f, 2.0f); }
 void SetZoom(float zoom) { SetFloat("zoom", std::clamp(zoom, 0.5f, 2.0f)); Get().Write(); }
 
-float GetOpacity() { return std::clamp(GetFloat("opacity", 1.0f), 0.2f, 1.0f); }
-void SetOpacity(float value) {
-    SetFloat("opacity", std::clamp(value, 0.2f, 1.0f));
+// Songs keep the old shared "opacity" key; the menu starts from it until it has its own.
+float GetOpacity(Logic::PoseSlot slot) {
+    float shared = GetFloat("opacity", 1.0f);
+    return std::clamp(slot == Logic::PoseSlot::Menu ? GetFloat(Key(slot, "opacity"), shared) : shared, 0.2f, 1.0f);
+}
+void SetOpacity(Logic::PoseSlot slot, float value) {
+    SetFloat(Key(slot, "opacity"), std::clamp(value, 0.2f, 1.0f));
     Get().Write();
 }
 

@@ -115,6 +115,8 @@ void Apply() {
         // While a song plays only the page shows; the toolbar comes back on pause.
         browserScreen->SetChromeHidden(!state.interactive);
         browserScreen->SetInteractive(state.interactive);
+        // The menu and songs each have their own opacity.
+        browserScreen->ApplyOpacity();
     }
 }
 
@@ -174,7 +176,7 @@ void ResetPosition(Logic::PoseSlot slot) {
 }
 
 void ResetCurrentPosition() {
-    ResetPosition(context == Logic::Context::Menu ? Logic::PoseSlot::Menu : Logic::PoseSlot::Song);
+    ResetPosition(CurrentSlot());
 }
 
 void ResetPositions() {

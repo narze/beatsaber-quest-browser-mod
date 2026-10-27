@@ -177,3 +177,9 @@ TEST_CASE("EnabledAfterMerge: one switch replaces Enable browser and Show browse
     CHECK_FALSE(EnabledAfterMerge(false, true));
     CHECK(EnabledAfterMerge(true, true));
 }
+
+TEST_CASE("SlotFor: the menu has its own settings, a song (playing or paused) has its own") {
+    CHECK(SlotFor(Context::Menu) == PoseSlot::Menu);
+    CHECK(SlotFor(Context::SongPlaying) == PoseSlot::Song);
+    CHECK(SlotFor(Context::SongPaused) == PoseSlot::Song);
+}

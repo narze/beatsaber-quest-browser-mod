@@ -49,6 +49,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     void RefreshForPose() {}
     // Play mode: hide the toolbar and close panels, so only the page shows.
     void SetChromeHidden(bool hidden);
+    // Applies the opacity of the current context (menu or song).
+    void ApplyOpacity() { ChangeOpacity(0.0f); }
     bool IsChromeHidden() const { return chromeHidden; }
     QuestBrowser::Resize::Dimensions GetDimensions() const { return dimensions; }
 

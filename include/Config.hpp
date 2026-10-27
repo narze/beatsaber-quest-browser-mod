@@ -44,8 +44,9 @@ int GetAspectPreset(Logic::PoseSlot slot);
 void SetAspectPreset(Logic::PoseSlot slot, int preset);
 float GetZoom();
 void SetZoom(float zoom);
-float GetOpacity();
-void SetOpacity(float value);
+// One opacity for the menu and one for songs.
+float GetOpacity(Logic::PoseSlot slot);
+void SetOpacity(Logic::PoseSlot slot, float value);
 // Where the keyboard opens, relative to the direction the player faces: offset in
 // meters (x right, y up, z away) and turn relative to facing the player.
 struct KeyboardPlacement {

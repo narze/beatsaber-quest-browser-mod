@@ -162,6 +162,9 @@ inline int FrameRateFor(bool interactive) { return interactive ? 60 : 30; }
 enum class Context { Menu, SongPlaying, SongPaused };
 enum class PoseSlot { Menu, Song };
 
+// Which saved position, size and opacity apply: the menu ones, or the song ones (also while paused).
+inline PoseSlot SlotFor(Context context) { return context == Context::Menu ? PoseSlot::Menu : PoseSlot::Song; }
+
 struct ScreenState {
     bool visible;
     bool interactive;
@@ -175,7 +178,7 @@ inline ScreenState ScreenStateFor(Context context, bool userVisible, bool showIn
     bool inSong = context != Context::Menu;
     bool visible = userVisible && (!inSong || showInSong);
     bool interactive = context != Context::SongPlaying;
-    return {visible, interactive, interactive, inSong ? PoseSlot::Song : PoseSlot::Menu};
+    return {visible, interactive, interactive, SlotFor(context)};
 }
 
 // One "Enable browser" switch replaced "Enable browser" and "Show browser".

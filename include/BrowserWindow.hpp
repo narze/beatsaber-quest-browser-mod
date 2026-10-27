@@ -23,6 +23,8 @@ void ResetCurrentPosition();
 void BoostHandleDepth(UnityEngine::Component* screen);
 // Menu, song playing, or song paused.
 Logic::Context CurrentContext();
+// The settings of the current context: menu or song.
+inline Logic::PoseSlot CurrentSlot() { return Logic::SlotFor(CurrentContext()); }
 void FitControls();
 float GetControlScale();
 float GetChromeHeight();
