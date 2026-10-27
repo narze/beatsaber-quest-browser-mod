@@ -4,7 +4,9 @@
 
 #include "BrowserWindow.hpp"
 #include "Config.hpp"
+#include "GlobalNamespace/OVRInput.hpp"
 #include "GlobalNamespace/VRController.hpp"
+#include "UnityEngine/XR/XRNode.hpp"
 #include "JniBridge.hpp"
 #include "songcore/shared/SongCore.hpp"
 #include "System/IntPtr.hpp"
@@ -139,7 +141,7 @@ ToolbarActions BrowserScreen::MakeToolbarActions() {
     a.label = [this]() { return ToolbarLabel(); };
     a.tabCount = [this]() { return static_cast<int>(std::max<std::size_t>(1, tabUrls.size())); };
     // Also stay while a map downloads, so that its progress shows.
-    a.pinned = [this]() { return openPanel != Panel::None || (keyboard && keyboard->IsVisible()) || !songStatus.empty(); };
+    a.pinned = [this]() { return openPanel != Panel::None || (keyboard && keyboard->IsVisible()) || !songStatus.empty() || zoomLabelSeconds > 0.0f; };
     a.interactive = [this]() { return interactive && !chromeHidden; };
     return a;
 }
@@ -155,6 +157,7 @@ void BrowserScreen::SetInteractive(bool value) {
         HideKeyboard();
         tracker = {};
         triggerHeld = false;
+        EndGrab();
     }
     if (ready && isActiveAndEnabled) Jni::SetFrameRate(Logic::FrameRateFor(value));
 }
@@ -228,6 +231,7 @@ void BrowserScreen::OnDisable() {
     }
     tracker = {};
     triggerHeld = false;
+    EndGrab();
 }
 
 void BrowserScreen::Update() {
@@ -238,6 +242,7 @@ void BrowserScreen::Update() {
     UpdateInput();
     UpdateLabels();
     viewportTimer -= Time::get_unscaledDeltaTime();
+    zoomLabelSeconds -= Time::get_unscaledDeltaTime();
     if (viewportDirty && viewportTimer <= 0) ApplyViewport();
 }
 
@@ -342,6 +347,9 @@ void BrowserScreen::UpdateInput() {
 
     UnityW<GlobalNamespace::VRController> controller = pointer->lastSelectedVrController;
     if (!controller) return;
+    auto overTarget = over ? over->transform : nullptr;
+    bool overWindow = overTarget && (overTarget->IsChildOf(transform) || (toolbar && overTarget->IsChildOf(toolbar->transform)));
+    if (UpdateGrab(controller.ptr(), overWindow)) return;
     float trigger = controller->triggerValue;
     bool wasHeld = triggerHeld;
     triggerHeld = triggerHeld ? trigger > kTriggerRelease : trigger > kTriggerPress;
@@ -374,11 +382,66 @@ void BrowserScreen::UpdateInput() {
             break;
     }
 
-    // Thumbstick scrolls the page under the pointer, unless a drag is active.
-    if (hit && !tracker.IsDown()) {
-        float amount = Logic::ThumbstickToScroll(controller->thumbstick.y, 0.2f, kScrollSpeed);
+    // While the laser is on the page, unless a drag is active: the right thumbstick scrolls
+    // the page under the pointer, the left thumbstick zooms.
+    auto touch = GlobalNamespace::OVRInput::Controller::Touch;
+    bool onPage = hit && !tracker.IsDown();
+    int zoomStep = zoomStepper.Update(
+        onPage ? GlobalNamespace::OVRInput::Get(GlobalNamespace::OVRInput::RawAxis2D::LThumbstick, touch).y : 0.0f,
+        Time::get_unscaledDeltaTime());
+    if (zoomStep != 0) {
+        ChangeZoom(0.1f * zoomStep);
+        zoomLabelSeconds = 1.5f;
+    }
+    if (onPage) {
+        float stick = GlobalNamespace::OVRInput::Get(GlobalNamespace::OVRInput::RawAxis2D::RThumbstick, touch).y;
+        float amount = Logic::ThumbstickToScroll(stick, 0.2f, kScrollSpeed);
         if (amount != 0.0f) Jni::Scroll(hit->x, hit->y, amount);
     }
+}
+
+namespace {
+float GripValue(GlobalNamespace::VRController* controller) {
+    using GlobalNamespace::OVRInput;
+    bool left = controller->node == UnityEngine::XR::XRNode::LeftHand;
+    return OVRInput::Get(left ? OVRInput::RawAxis1D::LHandTrigger : OVRInput::RawAxis1D::RHandTrigger, OVRInput::Controller::Touch);
+}
+}  // namespace
+
+// Press the grip while the laser is on the window or the toolbar: the window follows the
+// controller until the grip is released, and the thumbstick of that hand pushes it away
+// or pulls it closer.
+bool BrowserScreen::UpdateGrab(GlobalNamespace::VRController* controller, bool overWindow) {
+    if (grabController) {
+        if (!grip.Update(GripValue(grabController.ptr()))) {
+            EndGrab();
+            return false;
+        }
+        auto hand = grabController->transform;
+        grabPosition.z = Controls::GrabDepth(grabPosition.z, grabController->thumbstick.y, Time::get_unscaledDeltaTime());
+        transform->SetPositionAndRotation(hand->TransformPoint(grabPosition), Quaternion::op_Multiply(hand->rotation, grabRotation));
+        return true;
+    }
+    bool wasHeld = grip.Held();
+    if (!grip.Update(GripValue(controller)) || wasHeld || !overWindow) return false;
+    // Start: cancel a touch on the page, and keep the window pose relative to the controller.
+    if (tracker.IsDown()) {
+        auto p = tracker.LastPixel();
+        Jni::Touch(3, p.x, p.y);
+    }
+    tracker = {};
+    auto hand = controller->transform;
+    grabController = controller;
+    grabPosition = hand->InverseTransformPoint(transform->position);
+    grabRotation = Quaternion::op_Multiply(Quaternion::Inverse(hand->rotation), transform->rotation);
+    logger.info("Grabbed the window with the {} grip", controller->node == UnityEngine::XR::XRNode::LeftHand ? "left" : "right");
+    return true;
+}
+
+void BrowserScreen::EndGrab() {
+    if (!grabController) return;
+    grabController = nullptr;
+    Window::SavePosition();
 }
 
 void BrowserScreen::UpdateLabels() {
@@ -418,6 +481,7 @@ void BrowserScreen::UpdateLabels() {
 // page title (or address).
 std::string BrowserScreen::ToolbarLabel() {
     if (auto draft = Jni::GetUrlDraft()) return fmt::format("{}_", *draft);
+    if (zoomLabelSeconds > 0.0f) return fmt::format("Zoom {}%", static_cast<int>(Config::GetZoom() * 100 + 0.5f));
     if (!songStatus.empty()) return songStatus;
     auto title = Jni::GetTitle();
     std::string label = title.empty() ? Jni::GetUrl() : title;

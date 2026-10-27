@@ -16,6 +16,8 @@ void Refresh();
 void ResetPositions();
 // Settings: move the menu or the in-song window back to its default position and size.
 void ResetPosition(Logic::PoseSlot slot);
+// Grip grab: save the current position for the current context (menu or song).
+void SavePosition();
 // Keybind: reset the position of the current context (menu or song).
 void ResetCurrentPosition();
 // While the player holds the move handle of `screen`, the thumbstick pushes or pulls
