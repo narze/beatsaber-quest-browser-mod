@@ -98,3 +98,19 @@ TEST_CASE("Space types a space") {
     KeyboardState kb;
     CHECK(kb.Press(Find("Space")) == Output::Text(" "));
 }
+
+TEST_CASE("http:// and https:// type the URL start") {
+    KeyboardState kb;
+    CHECK(kb.Press(Find("http://")) == Output::Text("http://"));
+    CHECK(kb.Press(Find("https://")) == Output::Text("https://"));
+}
+
+TEST_CASE("No row is wider than the widest letter row, so the panel does not grow") {
+    auto width = [](Row const& row) {
+        float w = 0.0f;
+        for (auto const& key : row) w += key.width;
+        return w;
+    };
+    float letters = std::max(width(Layout()[2]), width(Layout()[3]));
+    for (auto const& row : Layout()) CHECK(width(row) <= letters + 0.001f);
+}

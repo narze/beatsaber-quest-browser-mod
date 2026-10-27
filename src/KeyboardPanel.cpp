@@ -155,7 +155,12 @@ void KeyboardPanel::Build(Vector2 size) {
     vertical->childControlHeight = true;
     vertical->childControlWidth = true;
     vertical->childAlignment = TextAnchor::UpperCenter;
-    if (auto bg = vertical->GetComponent<BSML::Backgroundable*>()) bg->ApplyBackground("round-rect-panel");
+    if (auto bg = vertical->GetComponent<BSML::Backgroundable*>()) {
+        bg->ApplyBackground("round-rect-panel");
+        // Solid to the laser between the keys: else a click in a gap hits nothing, which counts
+        // as a click outside, and the keyboard closes.
+        if (bg->background) bg->background->raycastTarget = true;
+    }
 
     for (auto const& row : rows) {
         auto horizontal = BSML::Lite::CreateHorizontalLayoutGroup(vertical->transform);
