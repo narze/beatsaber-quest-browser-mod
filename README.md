@@ -31,6 +31,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
    - Tabs come back at the next start. Only the open tab loads; the others load when you open them.
    - **Install maps**: on BeatSaver or BeastSaber, click **One-Click**; on BeatSaver or BeatLeader, click the map **Download** button. The map installs into your custom songs (`<key> (<song> - <mapper>)`), and the toolbar shows the progress. The song list reloads when you are in the menu; maps from the pause menu show up after the song. A map that is already installed is not downloaded again. Other downloads are not supported.
+   - **Install playlists**: on a BeatSaver or BeastSaber playlist, click **One-Click** or **Download**. The playlist is saved into the PlaylistManager playlists folder, and its maps install one by one. The song list and the playlists reload once, when all the maps are installed.
 4. Browser settings: **Enable browser** (on by default; off hides the window, the toolbar and the keyboard, turns off the keybind, and from the next start the browser does not load at all), show it during songs, the reset keybind (Off, X + Y, A + B, X + A, Y + B, left, right, or both stick clicks), and **Reset menu position** / **Reset in-song position**. A reset puts that window back at its default size, centered and raised above the song selection.
 
 The page stops (timers, video, audio) while the window is hidden. While a song plays, only the page shows; pause to see the controls. The move handle is above the window. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
@@ -77,7 +78,7 @@ Host unit tests (no device; the Java tests need a JDK):
 cmake -S tests -B build-tests && cmake --build build-tests && ctest --test-dir build-tests
 ```
 
-End-to-end test of the Java bridge on an Android emulator or device. It builds a small harness APK that loads the same dex the way the mod does. Then it taps, types, clicks, and scrolls, installs a BeatSaver map (needs internet), and saves the frames to `build-harness/`:
+End-to-end test of the Java bridge on an Android emulator or device. It builds a small harness APK that loads the same dex the way the mod does. Then it taps, types, clicks, and scrolls, installs a BeatSaver map and a playlist (needs internet), and saves the frames to `build-harness/`:
 
 ```sh
 tests/android-harness/run.sh
