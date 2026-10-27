@@ -6,6 +6,7 @@
 #include "Config.hpp"
 #include "GlobalNamespace/VRController.hpp"
 #include "JniBridge.hpp"
+#include "songcore/shared/SongCore.hpp"
 #include "System/IntPtr.hpp"
 #include "TMPro/FontStyles.hpp"
 #include "TMPro/TextAlignmentOptions.hpp"
@@ -134,7 +135,8 @@ ToolbarActions BrowserScreen::MakeToolbarActions() {
     a.toggleMenu = [this]() { ShowPanel(openPanel == Panel::Menu ? Panel::None : Panel::Menu); };
     a.label = [this]() { return ToolbarLabel(); };
     a.tabCount = [this]() { return static_cast<int>(std::max<std::size_t>(1, tabUrls.size())); };
-    a.pinned = [this]() { return openPanel != Panel::None || (keyboard && keyboard->IsVisible()); };
+    // Also stay while a map downloads, so that its progress shows.
+    a.pinned = [this]() { return openPanel != Panel::None || (keyboard && keyboard->IsVisible()) || !songStatus.empty(); };
     a.interactive = [this]() { return interactive && !chromeHidden; };
     return a;
 }
@@ -189,6 +191,7 @@ void BrowserScreen::Setup() {
         logger.error("Browser failed to start");
         return;
     }
+    Jni::SetSongsDir(SongCore::API::Loading::GetPreferredCustomLevelPath().string());
 #ifdef QB_DEBUG_SHOW_KEYBOARD
     // Debug builds (qpm s build -D QB_DEBUG_SHOW_KEYBOARD=1): open the keyboard at start, for screenshots.
     if (keyboard) keyboard->SetVisible(true);
@@ -387,6 +390,15 @@ void BrowserScreen::UpdateLabels() {
     // The user tapped a text field in the page.
     if (Jni::TakeKeyboardRequest() && interactive && keyboard) keyboard->SetVisible(true);
 
+    // Maps installed from the browser show up in the song list after SongCore reloads.
+    songStatus = Jni::GetSongStatus();
+    songRefresh.Installed(Jni::TakeSongsInstalled());
+    bool inMenu = Window::CurrentContext() == Logic::Context::Menu;
+    if (songRefresh.Take(inMenu, SongCore::API::Loading::AreSongsRefreshing())) {
+        logger.info("Reloading songs for new maps");
+        SongCore::API::Loading::RefreshSongs(false);
+    }
+
     auto url = Jni::GetUrl();
     if (Jni::GetProgress() == 100 && !url.empty() && url != lastHistoryUrl) {
         lastHistoryUrl = url;
@@ -396,9 +408,11 @@ void BrowserScreen::UpdateLabels() {
     }
 }
 
-// Text in the toolbar: the address being typed, else the page title (or address).
+// Text in the toolbar: the address being typed, else the map download status, else the
+// page title (or address).
 std::string BrowserScreen::ToolbarLabel() {
     if (auto draft = Jni::GetUrlDraft()) return fmt::format("{}_", *draft);
+    if (!songStatus.empty()) return songStatus;
     auto title = Jni::GetTitle();
     std::string label = title.empty() ? Jni::GetUrl() : title;
     int progress = Jni::GetProgress();

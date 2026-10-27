@@ -6,7 +6,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 
 ## Use
 
-1. Install `QuestBrowser.qmod` with [ModsBeforeFriday](https://mbf.bsquest.xyz/) or QuestPatcher. It installs BSML, custom-types, and beatsaber-hook too if they are missing.
+1. Install `QuestBrowser.qmod` with [ModsBeforeFriday](https://mbf.bsquest.xyz/) or QuestPatcher. It installs BSML, custom-types, beatsaber-hook, and SongCore too if they are missing.
 2. The browser is one floating window. It stays open in the menu and in songs, and the page does not reload between them.
    - **Browser** in the mods list on the left of the main menu opens the browser settings (also in Mod settings > **Browser**). The **Enable browser** switch there turns the browser on or off.
    - Lost the window? Hold the **reset keybind** (default **X + Y**) for 0.6 s. The window shows again at its default size, centered and raised above the song selection. It works in the menu and while paused, not while a song plays. Choose the combo, or Off, in the Browser settings.
@@ -30,6 +30,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - **Zoom - / +** adjusts page zoom from 50% to 200%, without changing the window. Pages reflow to the new viewport. The keyboard follows the resized window. Minimum dimensions keep the toolbar and history usable.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `.com`, Del, and Enter.
    - Tabs come back at the next start. Only the open tab loads; the others load when you open them.
+   - **Install maps**: on BeatSaver or BeastSaber, click **One-Click**; on BeatSaver or BeatLeader, click the map **Download** button. The map installs into your custom songs (`<key> (<song> - <mapper>)`), and the toolbar shows the progress. The song list reloads when you are in the menu; maps from the pause menu show up after the song. A map that is already installed is not downloaded again. Other downloads are not supported.
 4. Browser settings: **Enable browser** (on by default; off hides the window, the toolbar and the keyboard, turns off the keybind, and from the next start the browser does not load at all), show it during songs, the reset keybind (Off, X + Y, A + B, X + A, Y + B, left, right, or both stick clicks), and **Reset menu position** / **Reset in-song position**. A reset puts that window back at its default size, centered and raised above the song selection.
 
 The page stops (timers, video, audio) while the window is hidden. While a song plays, only the page shows; pause to see the controls. The move handle is above the window. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
@@ -70,13 +71,13 @@ qpm s log       # or: adb logcat -s QuestBrowser
 
 ## Test
 
-Host unit tests (no device):
+Host unit tests (no device; the Java tests need a JDK):
 
 ```sh
 cmake -S tests -B build-tests && cmake --build build-tests && ctest --test-dir build-tests
 ```
 
-End-to-end test of the Java bridge on an Android emulator or device. It builds a small harness APK that loads the same dex the way the mod does. Then it taps, types, clicks, and scrolls, and saves the frames to `build-harness/`:
+End-to-end test of the Java bridge on an Android emulator or device. It builds a small harness APK that loads the same dex the way the mod does. Then it taps, types, clicks, and scrolls, installs a BeatSaver map (needs internet), and saves the frames to `build-harness/`:
 
 ```sh
 tests/android-harness/run.sh

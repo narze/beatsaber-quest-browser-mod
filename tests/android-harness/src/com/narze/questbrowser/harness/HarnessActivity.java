@@ -55,6 +55,10 @@ public class HarnessActivity extends Activity {
             runTabsTest();
             return;
         }
+        if ("songs".equals(getIntent().getStringExtra("mode"))) {
+            runSongsTest();
+            return;
+        }
         if ("viewport".equals(getIntent().getStringExtra("mode"))) {
             call("loadUrl", new Class<?>[] {String.class}, "file:///android_asset/viewport.html");
             whenTitle("wide clicks=0", () -> {
@@ -245,6 +249,52 @@ public class HarnessActivity extends Activity {
                 }, 50));
             }, 50));
         }, 50);
+    }
+
+    /** One-Click link, then the zip link of the same map. run.sh checks the log lines and the folder. */
+    private void runSongsTest() {
+        File songs = new File(getExternalFilesDir(null), "CustomLevels");
+        deleteTree(songs);
+        call("setSongsDir", new Class<?>[] {String.class}, songs.getPath());
+        call("loadUrl", new Class<?>[] {String.class}, "file:///android_asset/songs.html");
+        whenTitle("songs", () -> {
+            tap(W / 2f, H / 4f);  // One-Click link
+            whenSongStatus("Installed", () -> {
+                Log.i(TAG, "SONGS_URL_AFTER_ONECLICK " + call("getUrl", new Class<?>[0]));
+                Log.i(TAG, "SONGS_INSTALLED " + call("takeSongsInstalled", new Class<?>[0]));
+                String[] names = songs.list();
+                for (String n : names == null ? new String[0] : names) {
+                    String[] files = new File(songs, n).list();
+                    Log.i(TAG, "SONGS_FOLDER " + n + " files=" + (files == null ? 0 : files.length));
+                }
+                tap(W / 2f, H * 3 / 4f);  // zip link of the same map
+                whenSongStatus("Already installed", () -> {
+                    Log.i(TAG, "SONGS_INSTALLED_AGAIN " + call("takeSongsInstalled", new Class<?>[0]));
+                    Log.i(TAG, "SONGS_DONE");
+                });
+            });
+        });
+    }
+
+    /** Runs r once the song status starts with prefix (checks every 200 ms, up to 60 s). */
+    private void whenSongStatus(String prefix, Runnable r) {
+        whenSongStatus(prefix, r, 300);
+    }
+
+    private void whenSongStatus(String prefix, Runnable r, int triesLeft) {
+        String status = (String) call("getSongStatus", new Class<?>[0]);
+        if (status != null && !status.isEmpty()) Log.i(TAG, "SONGS_STATUS " + status);
+        if ((status != null && status.startsWith(prefix)) || triesLeft == 0) {
+            r.run();
+            return;
+        }
+        at(200, () -> whenSongStatus(prefix, r, triesLeft - 1));
+    }
+
+    private static void deleteTree(File f) {
+        File[] children = f.listFiles();
+        if (children != null) for (File child : children) deleteTree(child);
+        f.delete();
     }
 
     /** Runs r once the page title is title (checks every 200 ms, up to 20 s). */
