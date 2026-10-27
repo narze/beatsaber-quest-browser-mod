@@ -26,7 +26,8 @@ import java.util.zip.ZipInputStream;
 
 /**
  * Installs BeatSaver maps that the browser opens (One-Click links and map downloads) into
- * the SongCore song folder. One map at a time, on a background thread. The native side
+ * the SongCore song folder. A playlist link saves the playlist into the PlaylistManager
+ * folder and installs its maps. One job at a time, on a background thread. The native side
  * shows status() in the toolbar and reloads SongCore after takeInstalled() is not 0.
  */
 final class SongInstaller {
@@ -35,6 +36,7 @@ final class SongInstaller {
     private static final int TIMEOUT_MS = 20000;
     // Limits against broken or hostile zip files.
     private static final long MAX_BYTES = 200L * 1024 * 1024;
+    private static final long MAX_TEXT_BYTES = 10L * 1024 * 1024;
     private static final int MAX_ENTRIES = 1000;
     private static final long STATUS_MS = 5000;
 
@@ -46,6 +48,7 @@ final class SongInstaller {
     private static final Set<String> queued = ConcurrentHashMap.newKeySet();
     private static final AtomicInteger installed = new AtomicInteger();
     private static volatile String songsDir;
+    private static volatile String playlistsDir;
     private static volatile String status = "";
     // When status stops showing, in System.currentTimeMillis(). 0: until the next status.
     private static volatile long statusUntil;
@@ -57,17 +60,35 @@ final class SongInstaller {
         Log.i(TAG, "Song folder: " + songsDir);
     }
 
-    /** Starts installing the map that link points to. False if link is not a map link. */
+    static void setPlaylistsDir(String dir) {
+        playlistsDir = dir == null || dir.isEmpty() ? null : dir;
+        Log.i(TAG, "Playlist folder: " + playlistsDir);
+    }
+
+    /**
+     * Starts installing the map or the playlist that link points to. False if link is not
+     * a map or playlist link.
+     */
     static boolean offer(String link) {
-        final String api = SongLinks.apiUrlFor(link);
-        if (api == null) return false;
-        if (!queued.add(api)) return true;
-        if (queued.size() > 1) show("Queued map download", 0);
+        String api = SongLinks.apiUrlFor(link);
+        if (api != null) {
+            if (enqueue(api, () -> install(api)) && queued.size() > 1) show("Queued map download", 0);
+            return true;
+        }
+        String playlist = SongLinks.playlistUrlFor(link);
+        if (playlist == null) return false;
+        if (enqueue(playlist, () -> installPlaylist(playlist)) && queued.size() > 1) show("Queued playlist download", 0);
+        return true;
+    }
+
+    // False if the same job is already queued.
+    private static boolean enqueue(String id, Runnable job) {
+        if (!queued.add(id)) return false;
         worker.execute(() -> {
             try {
-                install(api);
+                job.run();
             } finally {
-                queued.remove(api);
+                queued.remove(id);
             }
         });
         return true;
@@ -85,7 +106,9 @@ final class SongInstaller {
         return status;
     }
 
+    /** Maps and playlists installed since the last call. 0 until the queue is empty, so that a playlist reloads the songs once. */
     static int takeInstalled() {
+        if (!queued.isEmpty()) return 0;
         return installed.getAndSet(0);
     }
 
@@ -137,6 +160,49 @@ final class SongInstaller {
         }
     }
 
+    private static void installPlaylist(String url) {
+        String name = "playlist";
+        try {
+            String dir = playlistsDir;
+            if (dir == null) throw new IOException("Playlist folder not known");
+            show("Finding playlist...", 0);
+            String text = readText(url);
+            JSONObject playlist = new JSONObject(text);
+            JSONArray songs = playlist.getJSONArray("songs");
+            String title = playlist.optString("playlistTitle", "");
+            if (!title.isEmpty()) name = title;
+
+            File folder = new File(dir);
+            if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Cannot create " + folder);
+            File target = new File(folder, SongLinks.playlistFileName(title));
+            File temp = new File(folder, target.getName() + ".part");
+            try (OutputStream out = new FileOutputStream(temp)) {
+                out.write(text.getBytes(StandardCharsets.UTF_8));
+            }
+            if (!temp.renameTo(target)) {
+                deleteTree(temp);
+                throw new IOException("Cannot move the playlist to " + target);
+            }
+            installed.incrementAndGet();
+            Log.i(TAG, "Saved playlist " + target + " with " + songs.length() + " maps");
+            show("Saved playlist: " + name + " (" + songs.length() + (songs.length() == 1 ? " map)" : " maps)"), STATUS_MS);
+
+            for (int i = 0; i < songs.length(); i++) {
+                JSONObject song = songs.optJSONObject(i);
+                if (song == null) continue;
+                String hash = song.optString("hash", "");
+                String key = song.optString("key", "");
+                String api = SongLinks.apiUrlFor(hash.matches("(?i)[0-9a-f]{40}")
+                        ? "https://cdn.beatsaver.com/" + hash + ".zip"
+                        : "beatsaver://" + key);
+                if (api != null) enqueue(api, () -> install(api));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Playlist install failed for " + url, e);
+            show("Download failed: " + name, STATUS_MS);
+        }
+    }
+
     private static JSONObject publishedVersion(JSONObject map) throws Exception {
         JSONArray versions = map.getJSONArray("versions");
         for (int i = 0; i < versions.length(); i++) {
@@ -182,7 +248,10 @@ final class SongInstaller {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buf = new byte[16384];
             int n;
-            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            while ((n = in.read(buf)) > 0) {
+                if (out.size() + n > MAX_TEXT_BYTES) throw new IOException("Response is too large: " + url);
+                out.write(buf, 0, n);
+            }
             return new String(out.toByteArray(), StandardCharsets.UTF_8);
         } finally {
             c.disconnect();

@@ -150,19 +150,21 @@ for want in "TABS_RESTORED count=2 active=1 titles=|tab two" \
     grep -qF "$want" "$OUT/logcat-tabs.txt" || { echo "FAIL: expected '$want'"; tabs=1; }
 done
 
-echo "== Map install test (needs internet: BeatSaver map 1a2b)"
+echo "== Map and playlist install test (needs internet: BeatSaver map 1a2b, playlist 1207883)"
 adb logcat -c
 adb shell am force-stop "$PKG"
 adb shell am start -n "$PKG/.HarnessActivity" --es mode songs >/dev/null
 songs=0
-for _ in $(seq 1 120); do
+for _ in $(seq 1 240); do
     if adb logcat -d -s QBHarness:* | grep -q "SONGS_DONE"; then break; fi
     sleep 0.5
 done
 adb logcat -d -s QBHarness:* QuestBrowser:* | tee "$OUT/logcat-songs.txt" | grep -E "SONGS_|map"
 for want in "SONGS_URL_AFTER_ONECLICK file:///android_asset/songs.html" "SONGS_INSTALLED 1" \
             "SONGS_FOLDER 1a2b (Believer RU Cover - BCPowerhouse) files=" \
-            "SONGS_STATUS Already installed: Believer RU Cover" "SONGS_INSTALLED_AGAIN 0" "SONGS_DONE"; do
+            "SONGS_STATUS Already installed: Believer RU Cover" "SONGS_INSTALLED_AGAIN 0" \
+            "Test.bplist with 1 maps" "SONGS_URL_AFTER_PLAYLIST file:///android_asset/songs.html" \
+            "SONGS_PLAYLIST_INSTALLED 2" "SONGS_PLAYLIST_FILE Test.bplist" "SONGS_FOLDERS 2" "SONGS_DONE"; do
     grep -qF "$want" "$OUT/logcat-songs.txt" || { echo "FAIL: expected '$want'"; songs=1; }
 done
 adb shell ls "$DIR/CustomLevels/1a2b\ \(Believer\ RU\ Cover\ -\ BCPowerhouse\)/" | grep -qi "^info.dat$" \

@@ -91,4 +91,41 @@ class SongLinksTest {
         assertNull(SongLinks.safeEntryName(""));
         assertNull(SongLinks.safeEntryName(null));
     }
+
+    private static final String PLAYLIST = "https://api.beatsaver.com/playlists/id/1280881/download";
+
+    @Test
+    void playlistOneClickGivesThePlaylistFile() {
+        assertEquals(PLAYLIST + "/beatsaver-1280881.bplist",
+                SongLinks.playlistUrlFor("bsplaylist://playlist/" + PLAYLIST + "/beatsaver-1280881.bplist"));
+        assertEquals("https://bsaber.com/PlaylistAPI/22-01-01.bplist",
+                SongLinks.playlistUrlFor("bsplaylist://playlist/https://bsaber.com/PlaylistAPI/22-01-01.bplist"));
+    }
+
+    @Test
+    void playlistDownloadGivesThePlaylistFile() {
+        assertEquals(PLAYLIST, SongLinks.playlistUrlFor(PLAYLIST));
+        assertEquals(PLAYLIST + "/sign?x=1", SongLinks.playlistUrlFor(PLAYLIST + "/sign?x=1"));
+    }
+
+    @Test
+    void otherLinksAreNotPlaylists() {
+        assertNull(SongLinks.playlistUrlFor(null));
+        assertNull(SongLinks.playlistUrlFor("bsplaylist://playlist/"));
+        assertNull(SongLinks.playlistUrlFor("bsplaylist://playlist/http://api.beatsaver.com/x.bplist"));
+        assertNull(SongLinks.playlistUrlFor("bsplaylist://playlist/https://example.com/x.bplist"));
+        assertNull(SongLinks.playlistUrlFor("bsplaylist://playlist/https://beatsaver.com.example.com/x.bplist"));
+        assertNull(SongLinks.playlistUrlFor("https://beatsaver.com/playlists/1280881"));
+        assertNull(SongLinks.playlistUrlFor("https://example.com/playlists/id/1/download"));
+        assertNull(SongLinks.playlistUrlFor("beatsaver://1a2b"));
+    }
+
+    @Test
+    void playlistFileNameIsTheTitle() {
+        assertEquals("Curator's Picks September 2026.bplist",
+                SongLinks.playlistFileName("Curator's Picks September 2026"));
+        assertEquals("Rock Metal.bplist", SongLinks.playlistFileName("Rock / Metal?"));
+        assertEquals("playlist.bplist", SongLinks.playlistFileName(" ... "));
+        assertEquals("playlist.bplist", SongLinks.playlistFileName(null));
+    }
 }

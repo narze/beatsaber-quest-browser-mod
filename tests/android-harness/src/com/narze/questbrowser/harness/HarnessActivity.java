@@ -254,11 +254,14 @@ public class HarnessActivity extends Activity {
     /** One-Click link, then the zip link of the same map. run.sh checks the log lines and the folder. */
     private void runSongsTest() {
         File songs = new File(getExternalFilesDir(null), "CustomLevels");
+        File playlists = new File(getExternalFilesDir(null), "Playlists");
         deleteTree(songs);
+        deleteTree(playlists);
         call("setSongsDir", new Class<?>[] {String.class}, songs.getPath());
+        call("setPlaylistsDir", new Class<?>[] {String.class}, playlists.getPath());
         call("loadUrl", new Class<?>[] {String.class}, "file:///android_asset/songs.html");
         whenTitle("songs", () -> {
-            tap(W / 2f, H / 4f);  // One-Click link
+            tap(W / 2f, H / 6f);  // One-Click link
             whenSongStatus("Installed", () -> {
                 Log.i(TAG, "SONGS_URL_AFTER_ONECLICK " + call("getUrl", new Class<?>[0]));
                 Log.i(TAG, "SONGS_INSTALLED " + call("takeSongsInstalled", new Class<?>[0]));
@@ -267,10 +270,19 @@ public class HarnessActivity extends Activity {
                     String[] files = new File(songs, n).list();
                     Log.i(TAG, "SONGS_FOLDER " + n + " files=" + (files == null ? 0 : files.length));
                 }
-                tap(W / 2f, H * 3 / 4f);  // zip link of the same map
+                tap(W / 2f, H / 2f);  // zip link of the same map
                 whenSongStatus("Already installed", () -> {
                     Log.i(TAG, "SONGS_INSTALLED_AGAIN " + call("takeSongsInstalled", new Class<?>[0]));
-                    Log.i(TAG, "SONGS_DONE");
+                    tap(W / 2f, H * 5 / 6f);  // playlist One-Click link
+                    whenSongStatus("Installed", () -> at(1000, () -> {
+                        Log.i(TAG, "SONGS_URL_AFTER_PLAYLIST " + call("getUrl", new Class<?>[0]));
+                        Log.i(TAG, "SONGS_PLAYLIST_INSTALLED " + call("takeSongsInstalled", new Class<?>[0]));
+                        String[] files = playlists.list();
+                        for (String n : files == null ? new String[0] : files) Log.i(TAG, "SONGS_PLAYLIST_FILE " + n);
+                        String[] folders = songs.list();
+                        Log.i(TAG, "SONGS_FOLDERS " + (folders == null ? 0 : folders.length));
+                        Log.i(TAG, "SONGS_DONE");
+                    }));
                 });
             });
         });

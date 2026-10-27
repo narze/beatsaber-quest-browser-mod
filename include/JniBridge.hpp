@@ -52,9 +52,11 @@ std::optional<std::string> TakeSubmittedUrl();
 
 // Maps from BeatSaver One-Click links and downloads install into dir (SongCore custom levels).
 void SetSongsDir(std::string_view dir);
+// Playlists from BeatSaver and BeastSaber playlist links are saved into dir (PlaylistManager).
+void SetPlaylistsDir(std::string_view dir);
 // Map download status for the toolbar, or "" when there is nothing to show.
 std::string GetSongStatus();
-// Maps installed since the last call.
+// Maps and playlists installed since the last call.
 int TakeSongsInstalled();
 
 std::string GetUrl();

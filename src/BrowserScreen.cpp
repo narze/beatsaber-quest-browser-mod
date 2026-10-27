@@ -25,6 +25,7 @@
 #include "UnityEngine/UI/VerticalLayoutGroup.hpp"
 #include "bsml/shared/BSML-Lite.hpp"
 #include "bsml/shared/BSML.hpp"
+#include "beatsaber-hook/shared/config/config-utils.hpp"
 #include "main.hpp"
 
 DEFINE_TYPE(QuestBrowser, BrowserScreen);
@@ -192,6 +193,8 @@ void BrowserScreen::Setup() {
         return;
     }
     Jni::SetSongsDir(SongCore::API::Loading::GetPreferredCustomLevelPath().string());
+    // The folder that PlaylistCore (PlaylistManager) loads playlists from. It reloads them when SongCore reloads.
+    Jni::SetPlaylistsDir((std::filesystem::path(getDataDir("PlaylistManager")) / "Playlists").string());
 #ifdef QB_DEBUG_SHOW_KEYBOARD
     // Debug builds (qpm s build -D QB_DEBUG_SHOW_KEYBOARD=1): open the keyboard at start, for screenshots.
     if (keyboard) keyboard->SetVisible(true);
