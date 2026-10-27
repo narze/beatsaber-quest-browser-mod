@@ -496,6 +496,14 @@ void BrowserScreen::BuildMenu() {
         ToggleKeyboard();
     });
 
+    auto sites = Row(panel);
+    for (auto const& site : Songs::kMapSites) {
+        Button(sites->transform, site.name, 33.0f, [this, url = site.url]() {
+            ShowPanel(Panel::None);
+            Jni::LoadUrl(url);
+        });
+    }
+
     auto zoom = Row(panel);
     Button(zoom->transform, "-", 14.0f, [this]() { ChangeZoom(-0.1f); });
     zoomText = Label(zoom->transform, "", 44.0f);
