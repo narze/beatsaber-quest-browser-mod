@@ -20,6 +20,13 @@ public final class SongLinks {
     private static final Pattern MAP_ZIP =
             Pattern.compile("(?i)https://([a-z0-9-]+\\.)*beatsaver\\.com/([0-9a-f]{40})\\.zip([?#].*)?");
 
+    // One-Click buttons for playlists on BeatSaver and BeastSaber: bsplaylist://playlist/<file URL>.
+    private static final Pattern PLAYLIST_ONE_CLICK = Pattern.compile("(?i)bsplaylist://playlist/(https://.+)");
+    private static final Pattern PLAYLIST_HOST = Pattern.compile("(?i)https://([a-z0-9-]+\\.)*(beatsaver|bsaber)\\.com/.*");
+    // Download buttons on BeatSaver playlist pages.
+    private static final Pattern PLAYLIST_DOWNLOAD =
+            Pattern.compile("(?i)https://api\\.beatsaver\\.com/playlists/id/[0-9]+/download([/?#].*)?");
+
     private SongLinks() {}
 
     /** The BeatSaver API URL of the map that a link points to, or null if it is not a map link. */
@@ -30,6 +37,22 @@ public final class SongLinks {
         m = MAP_ZIP.matcher(link);
         if (m.matches()) return API + "hash/" + m.group(2).toLowerCase(Locale.ROOT);
         return null;
+    }
+
+    /** The URL of the playlist file (.bplist) that a link points to, or null if it is not a playlist link. */
+    public static String playlistUrlFor(String link) {
+        if (link == null) return null;
+        Matcher m = PLAYLIST_ONE_CLICK.matcher(link);
+        if (m.matches()) return PLAYLIST_HOST.matcher(m.group(1)).matches() ? m.group(1) : null;
+        return PLAYLIST_DOWNLOAD.matcher(link).matches() ? link : null;
+    }
+
+    /** File name for a saved playlist: "<title>.bplist", safe as a file name. */
+    public static String playlistFileName(String title) {
+        String name = clean(title);
+        if (name.isEmpty()) name = "playlist";
+        if (name.length() > MAX_FOLDER_NAME) name = name.substring(0, MAX_FOLDER_NAME);
+        return name + ".bplist";
     }
 
     /** Folder name for an installed map: "key (song - mapper)", safe as a file name. */
