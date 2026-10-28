@@ -65,7 +65,8 @@ inline std::vector<Row> const& Layout() {
         {Special(Kind::Shift, "Shift", 2.3f), Char("z", "Z"), Char("x", "X"), Char("c", "C"), Char("v", "V"), Char("b", "B"),
          Char("n", "N"), Char("m", "M"), Char(",", "<"), Char(".", ">"), Char("/", "?"), Special(Kind::Key, "Up", 1.0f, 19),
          Special(Kind::Text, ".com", 1.7f, 0, ".com")},
-        {Special(Kind::Ctrl, "Ctrl", 1.6f), Special(Kind::Key, "Esc", 1.4f, 111), Special(Kind::Text, "Space", 6.4f, 0, " "),
+        {Special(Kind::Ctrl, "Ctrl", 1.6f), Special(Kind::Key, "Esc", 1.4f, 111), Special(Kind::Text, "http://", 1.8f, 0, "http://"),
+         Special(Kind::Text, "Space", 3.6f, 0, " "), Special(Kind::Text, "https://", 1.9f, 0, "https://"),
          Special(Kind::Key, "Left", 1.0f, 21), Special(Kind::Key, "Down", 1.0f, 20), Special(Kind::Key, "Right", 1.0f, 22),
          Special(Kind::Hide, "Hide", 1.6f)},
     };

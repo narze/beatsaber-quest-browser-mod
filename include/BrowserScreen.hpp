@@ -12,6 +12,11 @@
 #include "VRUIControls/VRPointer.hpp"
 #include "KeyboardPanel.hpp"
 #include "ToolbarPanel.hpp"
+#include "GlobalNamespace/VRController.hpp"
+#include "UnityEngine/Quaternion.hpp"
+#include "UnityEngine/Vector3.hpp"
+#include "bookmarks_logic.hpp"
+#include "controls_logic.hpp"
 #include "browser_logic.hpp"
 #include "resize_logic.hpp"
 #include "songs_logic.hpp"
@@ -49,16 +54,21 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     void RefreshForPose() {}
     // Play mode: hide the toolbar and close panels, so only the page shows.
     void SetChromeHidden(bool hidden);
+    // Applies the opacity of the current context (menu or song).
+    void ApplyOpacity() { ChangeOpacity(0.0f); }
     bool IsChromeHidden() const { return chromeHidden; }
     QuestBrowser::Resize::Dimensions GetDimensions() const { return dimensions; }
 
    private:
-    enum class Panel { None, Tabs, Menu, History };
+    enum class Panel { None, Tabs, Menu, History, Bookmarks };
 
     void Setup();
     ToolbarActions MakeToolbarActions();
     void UpdateTexture();
     void UpdateInput();
+    // Grip: grab and move the window. True while the window is held.
+    bool UpdateGrab(GlobalNamespace::VRController* controller, bool overWindow);
+    void EndGrab();
     void UpdateLabels();
     std::string ToolbarLabel();
     void HideKeyboard();
@@ -75,6 +85,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     void RefreshMenu();
     void BuildHistory();
     void RefreshHistory();
+    void BuildBookmarks();
+    void RefreshBookmarks();
     void BuildTabs();
     void RefreshTabs();
     Panel openPanel = Panel::None;
@@ -102,6 +114,14 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     std::size_t historyPage = 0;
     std::string lastHistoryUrl;
 
+    // Bookmarks panel.
+    std::vector<Bookmarks::Bookmark> bookmarks;
+    std::vector<UnityW<TMPro::TextMeshProUGUI>> bookmarkLabels;
+    std::vector<UnityW<UnityEngine::UI::Button>> bookmarkOpenButtons;
+    std::vector<UnityW<UnityEngine::UI::Button>> bookmarkDeleteButtons;
+    UnityW<TMPro::TextMeshProUGUI> bookmarksStatus;
+    std::size_t bookmarksPage = 0;
+
     // Tabs panel, and the tab list read from the Java side.
     void UpdateTabs();
     int tabsVersion = -1;
@@ -126,6 +146,14 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     float labelTimer = 0.0f;
     Logic::PointerTracker tracker;
     bool triggerHeld = false;
+    // Grab with the grip: the controller, and the window pose relative to it.
+    Controls::HeldButton grip;
+    UnityW<GlobalNamespace::VRController> grabController;
+    UnityEngine::Vector3 grabPosition;
+    UnityEngine::Quaternion grabRotation;
+    // Left thumbstick zoom, and how long the toolbar shows the new zoom.
+    Controls::StickStepper zoomStepper;
+    float zoomLabelSeconds = 0.0f;
     struct UploadStats {
         int frames = 0;
         int uploads = 0;

@@ -4,7 +4,9 @@
 
 #include "BrowserWindow.hpp"
 #include "Config.hpp"
+#include "GlobalNamespace/OVRInput.hpp"
 #include "GlobalNamespace/VRController.hpp"
+#include "UnityEngine/XR/XRNode.hpp"
 #include "JniBridge.hpp"
 #include "songcore/shared/SongCore.hpp"
 #include "System/IntPtr.hpp"
@@ -114,11 +116,13 @@ BrowserScreen* BrowserScreen::CreateIn(Transform* parent) {
     if (!screen->canvasGroup) screen->canvasGroup = go->AddComponent<CanvasGroup*>();
     BSML::parse_and_construct(kLayout, parent, screen);
     screen->history = Config::GetHistory();
-    screen->canvasGroup->alpha = Config::GetOpacity();
-    // Order of creation follows the Panel enum: Tabs, Menu, History.
+    screen->bookmarks = Config::GetBookmarks();
+    screen->canvasGroup->alpha = Config::GetOpacity(Window::CurrentSlot());
+    // Order of creation follows the Panel enum: Tabs, Menu, History, Bookmarks.
     screen->BuildTabs();
     screen->BuildMenu();
     screen->BuildHistory();
+    screen->BuildBookmarks();
     auto parentRect = parent->GetComponent<RectTransform*>();
     screen->keyboard = KeyboardPanel::Create(parent, parentRect ? parentRect->rect.height : 87.0f);
     screen->toolbar = ToolbarPanel::Create(parent, screen->keyboard.ptr(), screen->MakeToolbarActions());
@@ -137,7 +141,7 @@ ToolbarActions BrowserScreen::MakeToolbarActions() {
     a.label = [this]() { return ToolbarLabel(); };
     a.tabCount = [this]() { return static_cast<int>(std::max<std::size_t>(1, tabUrls.size())); };
     // Also stay while a map downloads, so that its progress shows.
-    a.pinned = [this]() { return openPanel != Panel::None || (keyboard && keyboard->IsVisible()) || !songStatus.empty(); };
+    a.pinned = [this]() { return openPanel != Panel::None || (keyboard && keyboard->IsVisible()) || !songStatus.empty() || zoomLabelSeconds > 0.0f; };
     a.interactive = [this]() { return interactive && !chromeHidden; };
     return a;
 }
@@ -153,6 +157,7 @@ void BrowserScreen::SetInteractive(bool value) {
         HideKeyboard();
         tracker = {};
         triggerHeld = false;
+        EndGrab();
     }
     if (ready && isActiveAndEnabled) Jni::SetFrameRate(Logic::FrameRateFor(value));
 }
@@ -226,6 +231,7 @@ void BrowserScreen::OnDisable() {
     }
     tracker = {};
     triggerHeld = false;
+    EndGrab();
 }
 
 void BrowserScreen::Update() {
@@ -236,6 +242,7 @@ void BrowserScreen::Update() {
     UpdateInput();
     UpdateLabels();
     viewportTimer -= Time::get_unscaledDeltaTime();
+    zoomLabelSeconds -= Time::get_unscaledDeltaTime();
     if (viewportDirty && viewportTimer <= 0) ApplyViewport();
 }
 
@@ -289,9 +296,10 @@ void BrowserScreen::ChangeZoom(float delta) {
 }
 
 void BrowserScreen::ChangeOpacity(float delta) {
-    if (delta != 0.0f) Config::SetOpacity(Config::GetOpacity() + delta);
+    auto slot = Window::CurrentSlot();
+    if (delta != 0.0f) Config::SetOpacity(slot, Config::GetOpacity(slot) + delta);
     // While a panel is open the window stays opaque; the new opacity applies when it closes.
-    if (canvasGroup) canvasGroup->alpha = openPanel == Panel::None ? Config::GetOpacity() : 1.0f;
+    if (canvasGroup) canvasGroup->alpha = openPanel == Panel::None ? Config::GetOpacity(slot) : 1.0f;
     RefreshMenu();
 }
 
@@ -339,6 +347,9 @@ void BrowserScreen::UpdateInput() {
 
     UnityW<GlobalNamespace::VRController> controller = pointer->lastSelectedVrController;
     if (!controller) return;
+    auto overTarget = over ? over->transform : nullptr;
+    bool overWindow = overTarget && (overTarget->IsChildOf(transform) || (toolbar && overTarget->IsChildOf(toolbar->transform)));
+    if (UpdateGrab(controller.ptr(), overWindow)) return;
     float trigger = controller->triggerValue;
     bool wasHeld = triggerHeld;
     triggerHeld = triggerHeld ? trigger > kTriggerRelease : trigger > kTriggerPress;
@@ -371,11 +382,66 @@ void BrowserScreen::UpdateInput() {
             break;
     }
 
-    // Thumbstick scrolls the page under the pointer, unless a drag is active.
-    if (hit && !tracker.IsDown()) {
-        float amount = Logic::ThumbstickToScroll(controller->thumbstick.y, 0.2f, kScrollSpeed);
+    // While the laser is on the page, unless a drag is active: the right thumbstick scrolls
+    // the page under the pointer, the left thumbstick zooms.
+    auto touch = GlobalNamespace::OVRInput::Controller::Touch;
+    bool onPage = hit && !tracker.IsDown();
+    int zoomStep = zoomStepper.Update(
+        onPage ? GlobalNamespace::OVRInput::Get(GlobalNamespace::OVRInput::RawAxis2D::LThumbstick, touch).y : 0.0f,
+        Time::get_unscaledDeltaTime());
+    if (zoomStep != 0) {
+        ChangeZoom(0.1f * zoomStep);
+        zoomLabelSeconds = 1.5f;
+    }
+    if (onPage) {
+        float stick = GlobalNamespace::OVRInput::Get(GlobalNamespace::OVRInput::RawAxis2D::RThumbstick, touch).y;
+        float amount = Logic::ThumbstickToScroll(stick, 0.2f, kScrollSpeed);
         if (amount != 0.0f) Jni::Scroll(hit->x, hit->y, amount);
     }
+}
+
+namespace {
+float GripValue(GlobalNamespace::VRController* controller) {
+    using GlobalNamespace::OVRInput;
+    bool left = controller->node == UnityEngine::XR::XRNode::LeftHand;
+    return OVRInput::Get(left ? OVRInput::RawAxis1D::LHandTrigger : OVRInput::RawAxis1D::RHandTrigger, OVRInput::Controller::Touch);
+}
+}  // namespace
+
+// Press the grip while the laser is on the window or the toolbar: the window follows the
+// controller until the grip is released, and the thumbstick of that hand pushes it away
+// or pulls it closer.
+bool BrowserScreen::UpdateGrab(GlobalNamespace::VRController* controller, bool overWindow) {
+    if (grabController) {
+        if (!grip.Update(GripValue(grabController.ptr()))) {
+            EndGrab();
+            return false;
+        }
+        auto hand = grabController->transform;
+        grabPosition.z = Controls::GrabDepth(grabPosition.z, grabController->thumbstick.y, Time::get_unscaledDeltaTime());
+        transform->SetPositionAndRotation(hand->TransformPoint(grabPosition), Quaternion::op_Multiply(hand->rotation, grabRotation));
+        return true;
+    }
+    bool wasHeld = grip.Held();
+    if (!grip.Update(GripValue(controller)) || wasHeld || !overWindow) return false;
+    // Start: cancel a touch on the page, and keep the window pose relative to the controller.
+    if (tracker.IsDown()) {
+        auto p = tracker.LastPixel();
+        Jni::Touch(3, p.x, p.y);
+    }
+    tracker = {};
+    auto hand = controller->transform;
+    grabController = controller;
+    grabPosition = hand->InverseTransformPoint(transform->position);
+    grabRotation = Quaternion::op_Multiply(Quaternion::Inverse(hand->rotation), transform->rotation);
+    logger.info("Grabbed the window with the {} grip", controller->node == UnityEngine::XR::XRNode::LeftHand ? "left" : "right");
+    return true;
+}
+
+void BrowserScreen::EndGrab() {
+    if (!grabController) return;
+    grabController = nullptr;
+    Window::SavePosition();
 }
 
 void BrowserScreen::UpdateLabels() {
@@ -415,6 +481,7 @@ void BrowserScreen::UpdateLabels() {
 // page title (or address).
 std::string BrowserScreen::ToolbarLabel() {
     if (auto draft = Jni::GetUrlDraft()) return fmt::format("{}_", *draft);
+    if (zoomLabelSeconds > 0.0f) return fmt::format("Zoom {}%", static_cast<int>(Config::GetZoom() * 100 + 0.5f));
     if (!songStatus.empty()) return songStatus;
     auto title = Jni::GetTitle();
     std::string label = title.empty() ? Jni::GetUrl() : title;
@@ -478,10 +545,11 @@ void BrowserScreen::ShowPanel(Panel panel) {
         if (panels[i]) panels[i]->SetActive(static_cast<int>(panel) == static_cast<int>(i) + 1);
     if (pageImage) pageImage->gameObject->SetActive(panel == Panel::None);
     // Panels are fully opaque, so they are easy to read; the page uses the opacity setting.
-    if (canvasGroup) canvasGroup->alpha = panel == Panel::None ? Config::GetOpacity() : 1.0f;
+    if (canvasGroup) canvasGroup->alpha = panel == Panel::None ? Config::GetOpacity(Window::CurrentSlot()) : 1.0f;
     if (panel == Panel::Tabs) RefreshTabs();
     if (panel == Panel::Menu) RefreshMenu();
     if (panel == Panel::History) RefreshHistory();
+    if (panel == Panel::Bookmarks) RefreshBookmarks();
 }
 
 void BrowserScreen::BuildMenu() {
@@ -494,6 +562,7 @@ void BrowserScreen::BuildMenu() {
         Jni::LoadUrl(Logic::kHomeUrl);
     });
     Button(nav->transform, "History", 33.0f, [this]() { ShowPanel(Panel::History); });
+    Button(nav->transform, "Bookmarks", 33.0f, [this]() { ShowPanel(Panel::Bookmarks); });
     Button(nav->transform, "Keyboard", 33.0f, [this]() {
         ShowPanel(Panel::None);
         ToggleKeyboard();
@@ -530,7 +599,7 @@ void BrowserScreen::BuildMenu() {
 void BrowserScreen::RefreshMenu() {
     constexpr char const* names[] = {"Free", "16:9", "4:3", "Portrait"};
     if (zoomText) zoomText->text = fmt::format("Zoom {}%", static_cast<int>(Config::GetZoom() * 100 + 0.5f));
-    if (opacityText) opacityText->text = fmt::format("Opacity {}%", static_cast<int>(Config::GetOpacity() * 100 + 0.5f));
+    if (opacityText) opacityText->text = fmt::format("Opacity {}%", static_cast<int>(Config::GetOpacity(Window::CurrentSlot()) * 100 + 0.5f));
     if (aspectText) aspectText->text = fmt::format("Shape: {}", names[std::clamp(Window::GetAspectPreset(), 0, 3)]);
 }
 
@@ -584,6 +653,62 @@ void BrowserScreen::RefreshHistory() {
         historyOpenButtons[row]->gameObject->SetActive(exists);
         historyDeleteButtons[row]->gameObject->SetActive(exists);
         if (historyLabels[row]) historyLabels[row]->text = exists ? history[index] : "";
+    }
+}
+
+// ---- Bookmarks -------------------------------------------------------------
+
+void BrowserScreen::BuildBookmarks() {
+    auto panel = MakePanel()->transform;
+    bookmarksStatus = Label(panel, "Bookmarks", 120.0f);
+    for (std::size_t row = 0; row < kRows; ++row) {
+        auto line = Row(panel);
+        auto open = Button(line->transform, "", 108.0f, [this, row]() {
+            auto index = bookmarksPage * kRows + row;
+            if (index >= bookmarks.size()) return;
+            auto url = bookmarks[index].url;
+            ShowPanel(Panel::None);
+            Jni::LoadUrl(url);
+        });
+        bookmarkLabels.push_back(open->GetComponentInChildren<TMPro::TextMeshProUGUI*>());
+        bookmarkOpenButtons.push_back(open);
+        bookmarkDeleteButtons.push_back(Button(line->transform, "Delete", 26.0f, [this, row]() {
+            auto index = bookmarksPage * kRows + row;
+            if (index >= bookmarks.size()) return;
+            bookmarks.erase(bookmarks.begin() + index);
+            Config::SetBookmarks(bookmarks);
+            RefreshBookmarks();
+        }));
+    }
+    auto controls = Row(panel);
+    Button(controls->transform, "Add this page", 34.0f, [this]() {
+        Bookmarks::Add(bookmarks, Jni::GetUrl(), Jni::GetTitle());
+        Config::SetBookmarks(bookmarks);
+        bookmarksPage = 0;
+        RefreshBookmarks();
+    });
+    Button(controls->transform, "Newer", 30.0f, [this]() {
+        if (bookmarksPage) --bookmarksPage;
+        RefreshBookmarks();
+    });
+    Button(controls->transform, "Older", 30.0f, [this]() {
+        if ((bookmarksPage + 1) * kRows < bookmarks.size()) ++bookmarksPage;
+        RefreshBookmarks();
+    });
+    Button(controls->transform, "Close", 30.0f, [this]() { ShowPanel(Panel::None); });
+}
+
+void BrowserScreen::RefreshBookmarks() {
+    bookmarksPage = std::min(bookmarksPage, bookmarks.empty() ? std::size_t(0) : (bookmarks.size() - 1) / kRows);
+    if (bookmarksStatus)
+        bookmarksStatus->text = bookmarks.empty() ? "No bookmarks"
+                                                  : fmt::format("Bookmarks  {}/{}", bookmarksPage + 1, (bookmarks.size() + kRows - 1) / kRows);
+    for (std::size_t row = 0; row < bookmarkLabels.size(); ++row) {
+        auto index = bookmarksPage * kRows + row;
+        bool exists = index < bookmarks.size();
+        bookmarkOpenButtons[row]->gameObject->SetActive(exists);
+        bookmarkDeleteButtons[row]->gameObject->SetActive(exists);
+        if (bookmarkLabels[row]) bookmarkLabels[row]->text = exists ? Bookmarks::Label(bookmarks[index]) : "";
     }
 }
 
