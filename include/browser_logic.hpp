@@ -182,9 +182,10 @@ enum class Context { Menu, SongPlaying, SongPaused };
 
 // Canvas sorting order of the browser window and toolbar (the keyboard uses one more).
 // A canvas with a higher order always draws on top. In the main menu the game's view
-// controllers use 10, so the browser goes above them. In songs it keeps the BSML
-// order, so the pause menu is not covered.
-inline int SortingOrderFor(Context context) { return context == Context::Menu ? 11 : 4; }
+// controllers use 10, so the browser goes above them. In songs it draws before all
+// transparent objects (walls, scores, trails, HUD at -2, pause menu); the depth
+// occluder (view_logic.hpp) hides those behind the window.
+inline int SortingOrderFor(Context context) { return context == Context::Menu ? 11 : -10; }
 
 // Return zero to let the game's normal raycast order decide.
 inline int BrowserRaycastPriority(Context context, bool leftBrowser, bool rightBrowser) {

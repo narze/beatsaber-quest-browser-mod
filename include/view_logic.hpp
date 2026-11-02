@@ -60,4 +60,12 @@ inline bool BlocksView(Vec3 eye, std::vector<Vec3> const& window, Vec3 min, Vec3
     return std::any_of(window.begin(), window.end(), [&](Vec3 p) { return SegmentHitsBox(eye, p, min, max); });
 }
 
+// The depth occluder: a depth-only copy of the window shape, a little behind the page.
+// It draws after the opaque scenery (still visible through a see-through window) and
+// before the transparent objects, so that those behind the window fail the depth test.
+constexpr int kOccluderQueue = 2499;
+constexpr float kOccluderGapMeters = 0.02f;
+
+inline float OccluderGapUnits(float worldScale) { return kOccluderGapMeters / std::max(worldScale, 0.0001f); }
+
 }  // namespace QuestBrowser::View

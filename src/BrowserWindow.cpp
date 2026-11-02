@@ -26,6 +26,11 @@
 #include "UnityEngine/Time.hpp"
 #include "UnityEngine/Bounds.hpp"
 #include "UnityEngine/Canvas.hpp"
+#include "UnityEngine/Material.hpp"
+#include "UnityEngine/MeshRenderer.hpp"
+#include "UnityEngine/Resources.hpp"
+#include "UnityEngine/Shader.hpp"
+#include "UnityEngine/Rendering/ShadowCastingMode.hpp"
 #include "UnityEngine/FindObjectsSortMode.hpp"
 #include "UnityEngine/Renderer.hpp"
 #include "UnityEngine/SceneManagement/Scene.hpp"
@@ -215,15 +220,97 @@ void ShapeHandle(GameObject* handle, Vector2 size) {
     box->enabled = false;
 }
 
+// The depth occluder (see view_logic.hpp): a depth-only mesh in the shape of the
+// window, just behind the page. Transparent objects behind the window (laser glows)
+// then do not draw over it; those in front (walls, scores) still do.
+SafePtrUnity<GameObject> occluder;
+SafePtrUnity<Mesh> occluderMesh;
+SafePtrUnity<Material> occluderMaterial;
+float occluderRadius = -2.0f, occluderWidth = -1.0f, occluderHeight = -1.0f, occluderGap = -1.0f;
+bool occluderWarned = false;
+
+Shader* FindDepthShader() {
+    constexpr char const* kName = "Custom/SetDepthOnly";
+    if (auto shader = Shader::Find(kName)) return shader.ptr();
+    auto type = reinterpret_cast<System::Type*>(il2cpp_utils::GetSystemType(classof(Shader*)));
+    for (auto object : Resources::FindObjectsOfTypeAll(type)) {
+        auto shader = reinterpret_cast<Shader*>(object.ptr());
+        if (shader && static_cast<std::string>(shader->name) == kName) return shader;
+    }
+    return nullptr;
+}
+
+void PlaceOccluder(Vector2 size) {
+    if (!floatingScreen) return;
+    if (!occluderMaterial) {
+        auto shader = FindDepthShader();
+        if (!shader) {
+            if (!occluderWarned) logger.warn("Depth shader not found: transparent objects behind the window can show over it");
+            occluderWarned = true;
+            return;
+        }
+        auto material = Material::New_ctor(shader);
+        material->renderQueue = View::kOccluderQueue;
+        occluderMaterial = material;
+    }
+    if (!occluder) {
+        auto object = GameObject::New_ctor("QuestBrowserDepth");
+        object->layer = floatingScreen->gameObject->layer;
+        object->transform->SetParent(floatingScreen->transform, false);
+        auto filter = object->AddComponent<MeshFilter*>();
+        auto renderer = object->AddComponent<MeshRenderer*>();
+        renderer->sharedMaterial = occluderMaterial.ptr();
+        renderer->shadowCastingMode = Rendering::ShadowCastingMode::Off;
+        renderer->receiveShadows = false;
+        occluderMesh = Mesh::New_ctor();
+        filter->sharedMesh = occluderMesh.ptr();
+        occluder = object;
+        occluderRadius = -2.0f;
+    }
+    auto settings = floatingScreen->GetComponent<HMUI::CurvedCanvasSettings*>();
+    float radius = settings ? settings->get_radius() : 0.0f;
+    float gap = View::OccluderGapUnits(floatingScreen->transform->lossyScale.x);
+    if (radius == occluderRadius && size.x == occluderWidth && size.y == occluderHeight && gap == occluderGap) return;
+    occluderRadius = radius;
+    occluderWidth = size.x;
+    occluderHeight = size.y;
+    occluderGap = gap;
+    int segments = radius > 0.0f ? 32 : 1;
+    ArrayW<Vector3> vertices(static_cast<il2cpp_array_size_t>((segments + 1) * 2));
+    ArrayW<int32_t> triangles(static_cast<il2cpp_array_size_t>(segments * 12));
+    for (int i = 0; i <= segments; ++i) {
+        float x = size.x * (static_cast<float>(i) / segments - 0.5f);
+        for (int row = 0; row < 2; ++row) {
+            Vector2 canvasPoint{x, size.y * (row - 0.5f)};
+            auto point = radius > 0.0f ? settings->TransformPointFromCanvasTo3D(canvasPoint) : Vector3(canvasPoint.x, canvasPoint.y, 0.0f);
+            // The page faces -z: +z is behind it.
+            point.z += gap;
+            vertices[i * 2 + row] = point;
+        }
+    }
+    // Both sides, so the shader's culling does not matter.
+    int n = 0;
+    for (int i = 0; i < segments; ++i) {
+        int a = i * 2, b = a + 2;
+        for (int t : {a, a + 1, b + 1, a, b + 1, b, a, b + 1, a + 1, a, b, b + 1}) triangles[n++] = t;
+    }
+    auto mesh = occluderMesh.ptr();
+    mesh->Clear();
+    mesh->vertices = vertices;
+    mesh->triangles = triangles;
+    mesh->RecalculateBounds();
+}
+
 // The move handle sits above the window: at the bottom it sank into the floor
 // and could not be reached. BSML puts a top handle across the top edge, where it
 // would cover the toolbar, so raise it just above the edge. BSML sets its own,
 // larger handle scale when the size changes; replace it here.
 void PlaceHandle() {
     if (!floatingScreen) return;
+    auto size = floatingScreen->get_ScreenSize();
+    PlaceOccluder(size);
     auto handle = floatingScreen->handle;
     if (!handle || !handle->m_CachedPtr.m_value) return;
-    auto size = floatingScreen->get_ScreenSize();
     auto handleSize = Resize::HandleSizeFor({size.x, size.y});
     float thickness = handleSize.thickness;
     handle->transform->localScale = Vector3(handleSize.width, thickness, thickness);

@@ -45,3 +45,15 @@ TEST_CASE("BlocksView: surroundings that contain the eye stay visible") {
     auto window = WindowSamples({0, 2, 10}, {3, 0, 0}, {0, 2, 0}, 5);
     CHECK_FALSE(BlocksView({0, 1.7f, 0}, window, {-50, -5, -50}, {50, 50, 50}));
 }
+
+TEST_CASE("Depth occluder: after the opaque scenery, before transparent glows and the UI") {
+    // Opaque scenery uses queues up to 2018; laser glows start at 2501; UI is 3000.
+    CHECK(kOccluderQueue > 2018);
+    CHECK(kOccluderQueue <= 2500);
+}
+
+TEST_CASE("Depth occluder: a small gap behind the page, in window units") {
+    // At the default scale (1 unit = 1.2 cm) the gap is under 2 units.
+    CHECK(OccluderGapUnits(0.012f) * 0.012f == doctest::Approx(kOccluderGapMeters));
+    CHECK(OccluderGapUnits(0.0f) > 0.0f);  // no division by zero
+}
