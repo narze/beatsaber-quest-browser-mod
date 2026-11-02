@@ -1,6 +1,7 @@
 #pragma once
 
 #include "HMUI/ViewController.hpp"
+#include "HMUI/ImageView.hpp"
 #include "TMPro/TextMeshProUGUI.hpp"
 #include "UnityEngine/CanvasGroup.hpp"
 #include "UnityEngine/MonoBehaviour.hpp"
@@ -28,6 +29,7 @@
 // Shows the page on a RawImage and turns laser pointer input into touches.
 DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::UI::RawImage>, pageImage);
+    DECLARE_INSTANCE_FIELD(UnityW<HMUI::ImageView>, curvedPageImage);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::Texture2D>, texture);
     DECLARE_INSTANCE_FIELD(UnityW<VRUIControls::VRPointer>, pointer);
     DECLARE_INSTANCE_FIELD(UnityW<UnityEngine::CanvasGroup>, canvasGroup);
@@ -48,6 +50,10 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     // Used while a song plays.
     void SetInteractive(bool value);
     void SetDimensions(QuestBrowser::Resize::Dimensions size);
+    void SetCurved(bool curved);
+    // Drop any controller hold and pending touch before moving the window on reset.
+    void CancelInteraction();
+    bool ContainsTarget(UnityEngine::Transform* target);
     // The window has no controls inside, so the minimum size does not grow with distance.
     float GetControlScale() const { return 1.0f; }
     float GetChromeHeight() const { return Resize::kChromeHeight; }
@@ -96,6 +102,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     std::vector<UnityW<UnityEngine::RectTransform>> panelContents;
 
     bool chromeHidden = false;
+    bool curvedEnabled = false;
     Resize::Dimensions dimensions;
     bool viewportDirty = true;
     float viewportTimer = 0;
@@ -104,6 +111,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     UnityW<TMPro::TextMeshProUGUI> zoomText;
     UnityW<TMPro::TextMeshProUGUI> opacityText;
     UnityW<TMPro::TextMeshProUGUI> aspectText;
+    UnityW<TMPro::TextMeshProUGUI> curveText;
 
     // History panel.
     std::vector<std::string> history;

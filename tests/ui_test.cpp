@@ -5,6 +5,12 @@
 
 using namespace QuestBrowser;
 
+TEST_CASE("Toolbar curvature follows the page at different control scales") {
+    CHECK(Toolbar::CurvatureRadius(225.0f, 1.0f) == doctest::Approx(225.0f));
+    CHECK(Toolbar::CurvatureRadius(225.0f, 2.0f) == doctest::Approx(112.5f));
+    CHECK(Toolbar::CurvatureRadius(0.0f, 2.0f) == doctest::Approx(0.0f));
+}
+
 TEST_CASE("Fader: hidden at start, fades in while pointed at") {
     Toolbar::Fader f;
     CHECK(f.Alpha() == doctest::Approx(0));

@@ -10,7 +10,7 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
 2. The browser is one floating window. It stays open in the menu and in songs, and the page does not reload between them.
    - **Browser** in the mods list on the left of the main menu opens the browser settings (also in Mod settings > **Browser**). The **Enable browser** switch there turns the browser on or off.
    - Lost the window? Hold the **reset keybind** (default **X + Y**) for 0.6 s. The window shows again at its default size, centered and raised above the song selection. It works in the menu and while paused, not while a song plays. Choose the combo, or Off, in the Browser settings.
-   - Menu: click the page, drag the handle above the window to move it (while you hold it, push the thumbstick up or down to move it away or closer), and drag its corners and edges to resize it. You can also point at the window or its toolbar and hold the **grip** button: the window follows your hand until you release the grip, and that thumbstick moves it away or closer.
+   - Menu: click the page, drag the handle above the window to move it (while you hold it, push the thumbstick up or down to move it away or closer), and drag its corners and edges to resize it. You can also point at the window or its toolbar and hold the **grip** button: the window follows your hand until you release the grip, and that thumbstick moves it away or closer. Either method can push the window up to 30 meters along the controller direction.
    - Song: the page shows, but you can not click it. Pause to click, move, or resize it.
    - The menu and songs each keep their own window position and size.
 3. Controls:
@@ -22,18 +22,20 @@ Target: Beat Saber **1.40.8_7379**, Scotland2 mod loader.
    - Back, Forward, URL, and **Menu** stay visible. **Menu > Browse** contains Reload, Home, Keyboard, and History. **Menu > View** contains aspect, zoom, and opacity controls (**Fade - / +**). Close Menu to give the page more room.
    - Buttons and labels grow with distance. The minimum window size fits the controls; there is no maximum window width or height.
    - Point at the page and pull the trigger to click. Hold the trigger and move to drag.
+   - While a song is paused, the browser receives pointer hits ahead of overlapping game UI; scene colliders do not block its controls.
    - With the laser on the page, move the right thumbstick up or down to scroll the page under the pointer, and the left thumbstick up or down to zoom in or out (10% steps; the toolbar shows the new zoom).
    - **Bookmarks** lists saved pages: open one, delete one, or **Add this page** to save the open page on top.
    - Clicking outside both the browser window and keyboard also closes the keyboard.
    - **History** opens up to 100 recent URLs, newest first. Click a URL to revisit it, **Delete** to remove one, or **Clear all** to erase the list. **Newer** and **Older** switch pages. History stays saved across restarts; recording starts with this version.
    - **Opacity - / +** adjusts the window from 20% to 100% in 10% steps. The menu and songs each keep their own opacity (for example 100% in the menu and 70% in songs); the buttons change the one in use. The setting stays saved across restarts.
+   - **Curve On/Off** switches the curved display, and **- / +** changes its strength from 1 to 10. The move handle and toolbar follow the curve. These controls share the saved settings on the Browser settings screen.
    - **Aspect** cycles Free, 16:9, 4:3, and Portrait (9:16). Presets constrain the page area, excluding the toolbar; select Free to unlock the ratio again. Width, height, and preset save separately for menus and songs.
    - **Zoom - / +** adjusts page zoom from 50% to 200%, without changing the window. Pages reflow to the new viewport. The keyboard follows the resized window. Minimum dimensions keep the toolbar and history usable.
    - The keyboard has a number row with symbols, Tab, Caps, Shift (one key), Ctrl (for Ctrl+A/C/V/Z), Esc, arrow keys, `http://`, `https://`, `.com`, Del, and Enter. A click in the gaps between keys does not close it.
    - Tabs come back at the next start. Only the open tab loads; the others load when you open them.
    - **Install maps**: on BeatSaver or BeastSaber, click **One-Click**; on BeatSaver or BeatLeader, click the map **Download** button. The map installs into your custom songs (`<key> (<song> - <mapper>)`), and the toolbar shows the progress. The song list reloads when you are in the menu; maps from the pause menu show up after the song. A map that is already installed is not downloaded again. Other downloads are not supported.
    - **Install playlists**: on a BeatSaver or BeastSaber playlist, click **One-Click** or **Download**. The playlist is saved into the PlaylistManager playlists folder, and its maps install one by one. The song list and the playlists reload once, when all the maps are installed.
-4. Browser settings: **Enable browser** (on by default; off hides the window, the toolbar and the keyboard, turns off the keybind, and from the next start the browser does not load at all), show it during songs, the reset keybind (Off, X + Y, A + B, X + A, Y + B, left, right, or both stick clicks), and **Reset menu position** / **Reset in-song position**. A reset puts that window back at its default size, centered and raised above the song selection.
+4. Browser settings: **Enable browser** (on by default; off hides the window, the toolbar and the keyboard, turns off the keybind, and from the next start the browser does not load at all), show it during songs, **Curved browser (experimental)** to switch between curved and flat display, **Curve level** from 1 (gentle) to 10 (strong), the reset keybind (Off, X + Y, A + B, X + A, Y + B, left, right, or both stick clicks), and **Reset menu position** / **Reset in-song position**. A reset puts that window back at its default size, centered and raised above the song selection. Curved mode is off by default, and its mode and level are saved across restarts.
 
 The page stops (timers, video, audio) while the window is hidden. While a song plays, only the page shows; pause to see the controls. The move handle is above the window. It updates at 60 fps in the menu and while paused, and at 30 fps while a song plays.
 
@@ -50,7 +52,7 @@ The page stops (timers, video, audio) while the window is hidden. While a song p
 ```
 
 - `java/src/.../BrowserBridge.java` is compiled to a dex at build time (`cmake/dex.cmake`) and embedded in the `.so` with an assembler `.incbin`. At runtime, `src/JniBridge.cpp` loads it with `InMemoryDexClassLoader`, so the mod is a single file.
-- `src/BrowserScreen.cpp` builds the BSML UI, copies new frames into a `Texture2D`, and converts laser pointer hits (`VRPointer.cursorPosition`) into page pixels.
+- `src/BrowserScreen.cpp` builds the BSML UI, copies new frames into a `Texture2D`, and converts laser pointer hits (`VRPointer.cursorPosition`) into page pixels. Flat mode displays the texture with a `RawImage`; experimental curved mode uses an `ImageView` and the game's curved canvas.
 - `include/browser_logic.hpp` holds the game-independent logic (URL parsing, coordinate mapping, touch state). It has host unit tests.
 
 ## Build

@@ -14,6 +14,8 @@
 
 namespace QuestBrowser {
 
+void RefreshCurvedText(UnityEngine::GameObject* root, bool curved);
+
 // What the toolbar shows and does. BrowserScreen fills it in.
 struct ToolbarActions {
     std::function<void()> back, forward, reload, editUrl, toggleTabs, toggleMenu;

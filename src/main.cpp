@@ -9,6 +9,7 @@
 #include "bsml/shared/BSML-Lite.hpp"
 #include "bsml/shared/BSML.hpp"
 #include "bsml/shared/BSML/Components/Settings/ToggleSetting.hpp"
+#include "bsml/shared/BSML/Components/Settings/IncrementSetting.hpp"
 #include "custom-types/shared/register.hpp"
 #include "scotland2/shared/modloader.h"
 
@@ -33,8 +34,15 @@ using QuestBrowser::Logic::PoseSlot;
 namespace Config = QuestBrowser::Config;
 namespace Window = QuestBrowser::Window;
 
-void BuildSettings(UnityEngine::Transform* parent) {
-    auto container = BSML::Lite::CreateScrollableSettingsContainer(parent);
+struct CurveSettingsControls {
+    SafePtrUnity<HMUI::ViewController> view;
+    SafePtrUnity<BSML::ToggleSetting> toggle;
+    SafePtrUnity<BSML::IncrementSetting> level;
+};
+std::vector<CurveSettingsControls> curveSettingsControls;
+
+void BuildSettings(HMUI::ViewController* view) {
+    auto container = BSML::Lite::CreateScrollableSettingsContainer(view->transform);
     auto c = container->transform;
     BSML::Lite::CreateToggle(c, "Enable browser", Config::GetEnabled(), [](bool value) {
         if (value == Config::GetEnabled()) return;
@@ -45,6 +53,17 @@ void BuildSettings(UnityEngine::Transform* parent) {
         Config::SetShowInSong(value);
         Window::Refresh();
     });
+    auto curvedToggle = BSML::Lite::CreateToggle(c, "Curved browser (experimental)", Config::GetCurved(), [](bool value) {
+        Config::SetCurved(value);
+        Window::Refresh();
+    });
+    auto curveLevel = BSML::Lite::CreateIncrementSetting(c, "Curve level", 0, 1.0f, Config::GetCurveLevel(),
+                                       QuestBrowser::Logic::kMinCurveLevel, QuestBrowser::Logic::kMaxCurveLevel,
+                                       [](float value) {
+                                           Config::SetCurveLevel(static_cast<int>(value));
+                                           Window::Refresh();
+                                       });
+    curveSettingsControls.push_back({view, curvedToggle, curveLevel});
 
     // Keep the names alive: the dropdown keeps the views.
     static std::vector<std::string_view> names;
@@ -59,7 +78,15 @@ void BuildSettings(UnityEngine::Transform* parent) {
 }
 
 void ShowSettings(HMUI::ViewController* viewController, bool firstActivation, bool, bool) {
-    if (firstActivation) BuildSettings(viewController->transform);
+    if (firstActivation) BuildSettings(viewController);
+    for (auto& controls : curveSettingsControls) {
+        if (!controls.view || controls.view.ptr() != viewController) continue;
+        if (controls.toggle && controls.toggle->toggle) {
+            controls.toggle->currentValue = Config::GetCurved();
+            controls.toggle->toggle->SetIsOnWithoutNotify(Config::GetCurved());
+        }
+        if (controls.level) controls.level->set_Value(Config::GetCurveLevel());
+    }
 }
 
 }  // namespace

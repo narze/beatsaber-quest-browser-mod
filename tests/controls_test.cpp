@@ -20,7 +20,9 @@ TEST_CASE("GrabDepth: the stick pushes the window away and pulls it closer") {
 TEST_CASE("GrabDepth: no change in the dead zone, and limits near and far") {
     CHECK(GrabDepth(2.0f, 0.15f, 1.0f) == 2.0f);
     CHECK(GrabDepth(0.4f, -1.0f, 1.0f) == kMinGrabDepth);
-    CHECK(GrabDepth(7.9f, 1.0f, 1.0f) == kMaxGrabDepth);
+    CHECK(GrabDepth(8.0f, 1.0f, 1.0f) > 8.0f);
+    CHECK(GrabDepth(20.0f, 1.0f, 1.0f) > 20.0f);
+    CHECK(GrabDepth(29.9f, 1.0f, 1.0f) == 30.0f);
 }
 
 TEST_CASE("StickStepper: one step at once, then repeats while held") {

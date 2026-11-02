@@ -3,6 +3,7 @@
 // Game-independent logic. Keep this file free of Unity and il2cpp headers
 // so that it can be unit tested on the host (see tests/).
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,6 +12,13 @@ namespace QuestBrowser::Logic {
 
 constexpr std::string_view kHomeUrl = "https://duckduckgo.com/";
 constexpr std::string_view kSearchPrefix = "https://duckduckgo.com/?q=";
+
+constexpr int kMinCurveLevel = 1;
+constexpr int kMaxCurveLevel = 10;
+constexpr int kDefaultCurveLevel = 3;
+inline float CurveRadius(float width, int level) {
+    return width * 4.5f / std::clamp(level, kMinCurveLevel, kMaxCurveLevel);
+}
 
 struct Rect {
     float x;  // left edge, in local units
@@ -88,6 +96,17 @@ inline std::optional<Pixel> LocalToPixel(Rect const& rect, float localX, float l
 
 // Converts a thumbstick Y value into a mouse wheel value for one frame.
 // Positive means scroll up, the same as Android AXIS_VSCROLL.
+// Invert the canvas's monotonic horizontal projection within the window bounds.
+template <typename Projection>
+float UnwrapCurveX(float projectedX, float left, float right, Projection project) {
+    for (int i = 0; i < 24; ++i) {
+        float middle = (left + right) * 0.5f;
+        if (project(middle) < projectedX) left = middle;
+        else right = middle;
+    }
+    return (left + right) * 0.5f;
+}
+
 inline float ThumbstickToScroll(float stickY, float deadZone = 0.2f, float speed = 1.0f) {
     if (stickY > -deadZone && stickY < deadZone) return 0.0f;
     float sign = stickY > 0.0f ? 1.0f : -1.0f;
@@ -160,6 +179,12 @@ class ActiveCounter {
 inline int FrameRateFor(bool interactive) { return interactive ? 60 : 30; }
 
 enum class Context { Menu, SongPlaying, SongPaused };
+
+// Return zero to let the game's normal raycast order decide.
+inline int BrowserRaycastPriority(Context context, bool leftBrowser, bool rightBrowser) {
+    if (context != Context::SongPaused || leftBrowser == rightBrowser) return 0;
+    return leftBrowser ? -1 : 1;
+}
 enum class PoseSlot { Menu, Song };
 
 // Which saved position, size and opacity apply: the menu ones, or the song ones (also while paused).

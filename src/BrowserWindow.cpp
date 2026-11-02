@@ -6,8 +6,18 @@
 #include "ShortcutListener.hpp"
 #include "GlobalNamespace/MainMenuViewController.hpp"
 #include "GlobalNamespace/PauseController.hpp"
+#include "HMUI/CurvedCanvasSettings.hpp"
+#include "UnityEngine/BoxCollider.hpp"
 #include "UnityEngine/Camera.hpp"
 #include "UnityEngine/GameObject.hpp"
+#include "UnityEngine/Mesh.hpp"
+#include "UnityEngine/MeshCollider.hpp"
+#include "UnityEngine/MeshFilter.hpp"
+#include "UnityEngine/EventSystems/PointerEventData.hpp"
+#include "UnityEngine/EventSystems/RaycastResult.hpp"
+#include "System/Collections/Generic/List_1.hpp"
+#include "VRUIControls/VRGraphicRaycaster.hpp"
+#include "VRUIControls/VRInputModule.hpp"
 #include "UnityEngine/Transform.hpp"
 #include "beatsaber-hook/shared/utils/hooking.hpp"
 #include "bsml/shared/BSML/FloatingScreen/FloatingScreen.hpp"
@@ -34,6 +44,81 @@ std::optional<Logic::PoseSlot> placedFor;
 SafePtrUnity<BSML::FloatingScreen> floatingScreen;
 SafePtrUnity<BrowserScreen> browserScreen;
 std::vector<SafePtrUnity<ResizeGrip>> resizeGrips;
+SafePtrUnity<GameObject> shapedHandle;
+SafePtrUnity<Mesh> flatHandleMesh;
+SafePtrUnity<Mesh> curvedHandleMesh;
+float handleRadius = -1.0f, handleWidth = -1.0f, handleHeight = -1.0f;
+
+// The stock handle is a cube with a box collider. Bend its mesh and collider
+// together so grabbing works across the full visible arc.
+void ShapeHandle(GameObject* handle, Vector2 size) {
+    auto settings = floatingScreen->GetComponent<HMUI::CurvedCanvasSettings*>();
+    auto filter = handle->GetComponent<MeshFilter*>();
+    auto box = handle->GetComponent<BoxCollider*>();
+    if (!settings || !filter || !box) return;
+    if (!shapedHandle || shapedHandle.ptr() != handle) {
+        shapedHandle = handle;
+        flatHandleMesh = filter->sharedMesh.ptr();
+        curvedHandleMesh = nullptr;
+        handleRadius = -1.0f;
+    }
+    float radius = settings->get_radius();
+    if (handleRadius == radius && handleWidth == size.x && handleHeight == size.y) return;
+    handleRadius = radius;
+    handleWidth = size.x;
+    handleHeight = size.y;
+    auto collider = handle->GetComponent<MeshCollider*>();
+    if (radius <= 0.0f) {
+        if (flatHandleMesh) filter->sharedMesh = flatHandleMesh.ptr();
+        if (collider) collider->enabled = false;
+        box->enabled = true;
+        return;
+    }
+    constexpr int segments = 32;
+    ArrayW<Vector3> vertices(static_cast<il2cpp_array_size_t>((segments + 1) * 4));
+    ArrayW<int32_t> triangles(static_cast<il2cpp_array_size_t>(segments * 24 + 12));
+    float width = size.x * 0.8f;
+    float thickness = size.y / 15.0f;
+    float y = size.y / 2.0f + thickness / 2.0f + 1.0f;
+    for (int i = 0; i <= segments; ++i) {
+        float x = width * (static_cast<float>(i) / segments - 0.5f);
+        auto point = settings->TransformPointFromCanvasTo3D({x, y});
+        float px = point.x / width;
+        float pz = point.z / thickness;
+        vertices[i * 4] = {px, -0.5f, pz - 0.5f};
+        vertices[i * 4 + 1] = {px, 0.5f, pz - 0.5f};
+        vertices[i * 4 + 2] = {px, -0.5f, pz + 0.5f};
+        vertices[i * 4 + 3] = {px, 0.5f, pz + 0.5f};
+    }
+    int n = 0;
+    auto quad = [&](int a, int b, int c, int d) {
+        triangles[n++] = a; triangles[n++] = b; triangles[n++] = c;
+        triangles[n++] = a; triangles[n++] = c; triangles[n++] = d;
+    };
+    for (int i = 0; i < segments; ++i) {
+        int a = i * 4, b = a + 4;
+        quad(a, a + 1, b + 1, b);
+        quad(a + 2, b + 2, b + 3, a + 3);
+        quad(a + 1, a + 3, b + 3, b + 1);
+        quad(a, b, b + 2, a + 2);
+    }
+    quad(0, 2, 3, 1);
+    int end = segments * 4;
+    quad(end, end + 1, end + 3, end + 2);
+    if (!curvedHandleMesh) curvedHandleMesh = Mesh::New_ctor();
+    auto mesh = curvedHandleMesh.ptr();
+    if (collider) collider->sharedMesh = nullptr;
+    mesh->Clear();
+    mesh->vertices = vertices;
+    mesh->triangles = triangles;
+    mesh->RecalculateNormals();
+    mesh->RecalculateBounds();
+    filter->sharedMesh = mesh;
+    if (!collider) collider = handle->AddComponent<MeshCollider*>();
+    collider->sharedMesh = mesh;
+    collider->enabled = true;
+    box->enabled = false;
+}
 
 // The move handle sits above the window: at the bottom it sank into the floor
 // and could not be reached. BSML puts a top handle across the top edge, where it
@@ -45,6 +130,7 @@ void PlaceHandle() {
     auto size = floatingScreen->get_ScreenSize();
     float thickness = size.y / 15.0f;
     handle->transform->localPosition = Vector3(0.0f, size.y / 2.0f + thickness / 2.0f + 1.0f, 0.0f);
+    ShapeHandle(handle, size);
 }
 
 void ApplyDimensions(Resize::Dimensions size, bool save) {
@@ -52,6 +138,7 @@ void ApplyDimensions(Resize::Dimensions size, bool save) {
     floatingScreen->set_ScreenSize({size.width, size.height});
     PlaceHandle();
     if (browserScreen) browserScreen->SetDimensions(size);
+    PlaceHandle();
     if (save && placedFor) Config::SetDimensions(*placedFor, size);
 }
 
@@ -112,6 +199,8 @@ void Apply() {
     PlaceHandle();
     for (auto& grip : resizeGrips) if (grip) grip->gameObject->SetActive(state.showHandle);
     if (browserScreen) {
+        browserScreen->SetCurved(Config::GetCurved());
+        PlaceHandle();
         // While a song plays only the page shows; the toolbar comes back on pause.
         browserScreen->SetChromeHidden(!state.interactive);
         browserScreen->SetInteractive(state.interactive);
@@ -164,6 +253,13 @@ void CycleAspectPreset() {
 void OnSongEnded() { SetContext(Logic::Context::Menu); }
 
 void ResetPosition(Logic::PoseSlot slot) {
+    if (placedFor == slot) {
+        if (browserScreen) browserScreen->CancelInteraction();
+        if (floatingScreen && floatingScreen->handle) {
+            if (auto handle = floatingScreen->handle->GetComponent<BSML::FloatingScreenHandle*>())
+                handle->_grabbingController = nullptr;
+        }
+    }
     Config::ResetPose(slot);
     // Place the window again now if it shows this slot.
     if (placedFor == slot) placedFor.reset();
@@ -173,6 +269,37 @@ void ResetPosition(Logic::PoseSlot slot) {
         FitControls();
     }
     logger.info("Reset browser position for {}", slot == Logic::PoseSlot::Menu ? "menu" : "songs");
+}
+
+bool IsBrowserTarget(GameObject* target) {
+    return target && browserScreen && browserScreen->ContainsTarget(target->transform);
+}
+
+// While paused, allow the browser's own canvases to be selected through game
+// scene colliders. Do not change the game or other mods' raycasters.
+MAKE_HOOK_MATCH(VRGraphicRaycaster_Raycast, &VRUIControls::VRGraphicRaycaster::Raycast, void,
+                VRUIControls::VRGraphicRaycaster* self, UnityEngine::EventSystems::PointerEventData* eventData,
+                System::Collections::Generic::List_1<UnityEngine::EventSystems::RaycastResult>* results) {
+    if (context != Logic::Context::SongPaused || !IsBrowserTarget(self->gameObject)) {
+        VRGraphicRaycaster_Raycast(self, eventData, results);
+        return;
+    }
+    auto mask = self->_blockingMask;
+    self->_blockingMask = UnityEngine::LayerMask(0);
+    VRGraphicRaycaster_Raycast(self, eventData, results);
+    self->_blockingMask = mask;
+}
+
+// Competing game UI can otherwise win by being nearer than the browser.
+MAKE_HOOK_MATCH(VRInputModule_RaycastComparer, &VRUIControls::VRInputModule::RaycastComparer, int,
+                UnityEngine::EventSystems::RaycastResult lhs, UnityEngine::EventSystems::RaycastResult rhs) {
+    if (context == Logic::Context::SongPaused) {
+        bool left = IsBrowserTarget(lhs.get_gameObject());
+        bool right = IsBrowserTarget(rhs.get_gameObject());
+        int priority = Logic::BrowserRaycastPriority(context, left, right);
+        if (priority != 0) return priority;
+    }
+    return VRInputModule_RaycastComparer(lhs, rhs);
 }
 
 void SavePosition() {
@@ -220,6 +347,8 @@ MAKE_HOOK_MATCH(PauseController_HandlePauseMenuManagerDidPressContinueButton,
 }
 
 void InstallHooks() {
+    INSTALL_HOOK(logger, VRGraphicRaycaster_Raycast);
+    INSTALL_HOOK(logger, VRInputModule_RaycastComparer);
     INSTALL_HOOK(logger, MainMenuViewController_DidActivate);
     INSTALL_HOOK(logger, PauseController_Start);
     INSTALL_HOOK(logger, PauseController_Pause);

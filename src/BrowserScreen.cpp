@@ -4,6 +4,12 @@
 
 #include "BrowserWindow.hpp"
 #include "Config.hpp"
+#include "HMUI/CurvedCanvasSettings.hpp"
+#include "HMUI/CurvedCanvasSettingsHelper.hpp"
+#include "HMUI/CurvedTextMeshPro.hpp"
+#include "TMPro/TMP_TextInfo.hpp"
+#include "TMPro/TMP_MeshInfo.hpp"
+#include "UnityEngine/Mesh.hpp"
 #include "GlobalNamespace/OVRInput.hpp"
 #include "GlobalNamespace/VRController.hpp"
 #include "UnityEngine/XR/XRNode.hpp"
@@ -27,6 +33,7 @@
 #include "UnityEngine/UI/VerticalLayoutGroup.hpp"
 #include "bsml/shared/BSML-Lite.hpp"
 #include "bsml/shared/BSML.hpp"
+#include "bsml/shared/Helpers/getters.hpp"
 #include "beatsaber-hook/shared/config/config-utils.hpp"
 #include "main.hpp"
 
@@ -54,6 +61,30 @@ Color const kWhite{1.0f, 1.0f, 1.0f, 1.0f};
 
 // Shared by every BrowserScreen: the page runs while any screen is visible.
 Logic::ActiveCounter activeScreens;
+
+}  // namespace
+
+void RefreshCurvedText(GameObject* root, bool curved) {
+    if (!root || !root->activeInHierarchy) return;
+    for (auto text : root->GetComponentsInChildren<HMUI::CurvedTextMeshPro*>(false)) {
+        if (!text) continue;
+        if (text->_curvedCanvasSettingsHelper) text->_curvedCanvasSettingsHelper->Reset();
+        text->__Refresh();
+        text->ForceMeshUpdate(false, false);
+        if (!curved && text->textInfo) {
+            auto infos = text->textInfo->meshInfo;
+            for (int i = 0; i < static_cast<int>(infos.size()); ++i) {
+                auto mesh = infos[i].mesh;
+                if (!mesh) continue;
+                ArrayW<Vector2> zeroes(static_cast<il2cpp_array_size_t>(mesh->vertexCount));
+                mesh->uv3 = zeroes;
+                text->UpdateGeometry(mesh.ptr(), i);
+            }
+        }
+    }
+}
+
+namespace {
 
 // Only the page. Panels are added next to it in code; the toolbar floats below.
 constexpr std::string_view kLayout = R"xml(
@@ -177,6 +208,23 @@ void BrowserScreen::Setup() {
         pageImage->texture = texture.ptr();
         // Android bitmaps start at the top row, Unity textures at the bottom row.
         pageImage->uvRect = Rect(0.0f, 1.0f, 1.0f, -1.0f);
+
+        // ImageView carries the curved-canvas shader data; RawImage does not.
+        auto curved = GameObject::New_ctor("CurvedBrowserPage");
+        curved->layer = pageImage->gameObject->layer;
+        curvedPageImage = curved->AddComponent<HMUI::ImageView*>();
+        curvedPageImage->material = BSML::Helpers::GetUINoGlowMat();
+        curvedPageImage->sprite = BSML::Lite::TextureToSprite(texture.ptr());
+        curvedPageImage->raycastTarget = false;
+        auto rect = curvedPageImage->rectTransform;
+        rect->SetParent(pageImage->transform, false);
+        rect->anchorMin = {0.0f, 0.0f};
+        rect->anchorMax = {1.0f, 1.0f};
+        rect->offsetMin = {0.0f, 0.0f};
+        rect->offsetMax = {0.0f, 0.0f};
+        // Android's first bitmap row is the top of the page.
+        rect->localScale = Vector3(1.0f, -1.0f, 1.0f);
+        curved->SetActive(false);
     } else {
         logger.error("BSML did not bind pageImage");
     }
@@ -249,6 +297,7 @@ void BrowserScreen::Update() {
 void BrowserScreen::SetDimensions(Resize::Dimensions size) {
     if (dimensions.width == size.width && dimensions.height == size.height && !viewportDirty) return;
     dimensions = size;
+    if (curvedEnabled) SetCurved(true);
     float pageWidth = size.width - Resize::kPaddingWidth;
     float pageHeight = std::max(81.0f, size.height - GetChromeHeight());
     if (pageImage) {
@@ -272,6 +321,43 @@ void BrowserScreen::SetDimensions(Resize::Dimensions size) {
     if (keyboard) keyboard->SetWindowHeight(size.height);
     if (toolbar) toolbar->SetWindowSize(size.width, size.height);
     viewportDirty = true;
+}
+
+void BrowserScreen::SetCurved(bool curved) {
+    if (!pageImage || !curvedPageImage) return;
+    auto settings = GetComponent<HMUI::CurvedCanvasSettings*>();
+    if (!settings) return;
+    float radius = curved ? Logic::CurveRadius(dimensions.width, Config::GetCurveLevel()) : 0.0f;
+    bool changed = curved != curvedEnabled || settings->get_radius() != radius;
+    if (changed && tracker.IsDown()) {
+        auto p = tracker.LastPixel();
+        Jni::Touch(3, p.x, p.y);
+        tracker = {};
+    }
+    curvedEnabled = curved;
+    if (settings->get_radius() != radius) {
+        settings->SetRadius(radius);
+        HMUI::CurvedCanvasSettings::RebuildAndSetup(transform);
+        RefreshCurvedText(gameObject, curved);
+    }
+    pageImage->color = curved ? Color(1, 1, 1, 0) : Color(1, 1, 1, 1);
+    curvedPageImage->gameObject->SetActive(curved);
+}
+
+void BrowserScreen::CancelInteraction() {
+    if (tracker.IsDown()) {
+        auto p = tracker.LastPixel();
+        Jni::Touch(3, p.x, p.y);
+    }
+    tracker = {};
+    triggerHeld = false;
+    grip = {};
+    grabController = nullptr;
+}
+
+bool BrowserScreen::ContainsTarget(Transform* target) {
+    return target && (target->IsChildOf(transform) || (toolbar && target->IsChildOf(toolbar->transform)) ||
+                      (keyboard && target->IsChildOf(keyboard->transform)));
 }
 
 void BrowserScreen::ApplyViewport() {
@@ -340,7 +426,19 @@ void BrowserScreen::UpdateInput() {
     UnityW<GameObject> over = pointer->pointingOver;
     if (pageImage->gameObject->activeInHierarchy && over && over.ptr() == pageImage->gameObject.ptr()) {
         auto rectTransform = pageImage->rectTransform;
-        auto local = rectTransform->InverseTransformPoint(pointer->cursorPosition);
+        auto point = pointer->cursorPosition;
+        if (curvedEnabled) {
+            if (auto settings = GetComponent<HMUI::CurvedCanvasSettings*>()) {
+                auto canvasPoint = transform->InverseTransformPoint(point);
+                float half = dimensions.width * 0.5f;
+                canvasPoint.x = Logic::UnwrapCurveX(canvasPoint.x, -half, half, [settings, canvasPoint](float x) {
+                    return settings->TransformPointFromCanvasTo3D({x, canvasPoint.y}).x;
+                });
+                canvasPoint.z = 0.0f;
+                point = transform->TransformPoint(canvasPoint);
+            }
+        }
+        auto local = rectTransform->InverseTransformPoint(point);
         auto r = rectTransform->rect;
         hit = Logic::LocalToPixel({r.m_XMin, r.m_YMin, r.m_Width, r.m_Height}, local.x, local.y, kPageWidth, kPageHeight);
     }
@@ -550,6 +648,7 @@ void BrowserScreen::ShowPanel(Panel panel) {
     if (panel == Panel::Menu) RefreshMenu();
     if (panel == Panel::History) RefreshHistory();
     if (panel == Panel::Bookmarks) RefreshBookmarks();
+    if (panel != Panel::None) RefreshCurvedText(panels[static_cast<int>(panel) - 1].ptr(), curvedEnabled);
 }
 
 void BrowserScreen::BuildMenu() {
@@ -594,6 +693,24 @@ void BrowserScreen::BuildMenu() {
         RefreshMenu();
     });
     Button(shape->transform, "Close", 28.0f, [this]() { ShowPanel(Panel::None); });
+
+    auto curve = Row(panel);
+    Button(curve->transform, "On/Off", 30.0f, [this]() {
+        Config::SetCurved(!Config::GetCurved());
+        Window::Refresh();
+        RefreshMenu();
+    });
+    Button(curve->transform, "-", 14.0f, [this]() {
+        Config::SetCurveLevel(Config::GetCurveLevel() - 1);
+        Window::Refresh();
+        RefreshMenu();
+    });
+    curveText = Label(curve->transform, "", 52.0f);
+    Button(curve->transform, "+", 14.0f, [this]() {
+        Config::SetCurveLevel(Config::GetCurveLevel() + 1);
+        Window::Refresh();
+        RefreshMenu();
+    });
 }
 
 void BrowserScreen::RefreshMenu() {
@@ -601,6 +718,7 @@ void BrowserScreen::RefreshMenu() {
     if (zoomText) zoomText->text = fmt::format("Zoom {}%", static_cast<int>(Config::GetZoom() * 100 + 0.5f));
     if (opacityText) opacityText->text = fmt::format("Opacity {}%", static_cast<int>(Config::GetOpacity(Window::CurrentSlot()) * 100 + 0.5f));
     if (aspectText) aspectText->text = fmt::format("Shape: {}", names[std::clamp(Window::GetAspectPreset(), 0, 3)]);
+    if (curveText) curveText->text = fmt::format("Curve: {} {}", Config::GetCurved() ? "On" : "Off", Config::GetCurveLevel());
 }
 
 void BrowserScreen::BuildHistory() {

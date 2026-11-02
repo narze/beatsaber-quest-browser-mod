@@ -1,5 +1,7 @@
 #pragma once
 
+#include "controls_logic.hpp"
+
 // Game-independent math for resizing the browser window by dragging its corner.
 // Unit tested on the host (see tests/resize_test.cpp).
 
@@ -65,7 +67,8 @@ constexpr float kHandleDepthGain = 4.0f;
 // New grab distance (meters along the controller) after one frame of extra push.
 inline float HandleDepthStep(float grabDistance, float stickY, float deltaSeconds) {
     if (stickY > -0.2f && stickY < 0.2f) return grabDistance;
-    return std::clamp(grabDistance + (kHandleDepthGain - 1.0f) * stickY * deltaSeconds, 0.3f, 8.0f);
+    return std::clamp(grabDistance + (kHandleDepthGain - 1.0f) * stickY * deltaSeconds,
+                      Controls::kMinGrabDepth, Controls::kMaxGrabDepth);
 }
 
 // Where the ray (origin, direction) meets the plane (point, normal).
