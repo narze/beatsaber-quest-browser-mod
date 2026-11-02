@@ -95,8 +95,15 @@ void SetEnabled(bool value) { SetBool("enabled", value); }
 
 bool GetShowInSong() { return GetBool("showInSong", true); }
 void SetShowInSong(bool value) { SetBool("showInSong", value); }
-bool GetHideBlockers() { return GetBool("hideBlockers", false); }
-void SetHideBlockers(bool value) { SetBool("hideBlockers", value); }
+View::SceneryMode GetSceneryMode() {
+    std::optional<int> saved;
+    if (auto it = Doc().FindMember("sceneryMode"); it != Doc().MemberEnd() && it->value.IsNumber()) saved = static_cast<int>(it->value.GetFloat());
+    return View::SceneryModeFromConfig(saved, GetBool("hideBlockers", false));
+}
+void SetSceneryMode(View::SceneryMode mode) {
+    SetFloat("sceneryMode", static_cast<float>(static_cast<int>(mode)));
+    Get().Write();
+}
 bool GetCurved() { return GetBool("curved", false); }
 void SetCurved(bool value) { SetBool("curved", value); }
 int GetCurveLevel() {

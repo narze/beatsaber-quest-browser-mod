@@ -2,6 +2,9 @@
 
 #include "view_logic.hpp"
 
+#include <optional>
+#include <string>
+
 using namespace QuestBrowser::View;
 
 TEST_CASE("SegmentHitsBox: a box between the eye and the target blocks it") {
@@ -64,4 +67,41 @@ TEST_CASE("IsScenery: environment scenes and track rings, but not the HUD or gam
     CHECK_FALSE(IsScenery("GameCore", false, false));   // notes, sabers, trails
     CHECK_FALSE(IsScenery("StandardGameplay", false, false));
     CHECK_FALSE(IsScenery("DefaultEnvironment", false, true));  // HUD canvases
+}
+
+TEST_CASE("SceneryMode: names for the setting, and back") {
+    CHECK(std::string(SceneryModeName(SceneryMode::Off)) == "Off");
+    CHECK(std::string(SceneryModeName(SceneryMode::InFront)) == "In front of browser");
+    CHECK(std::string(SceneryModeName(SceneryMode::All)) == "All");
+    for (auto mode : {SceneryMode::Off, SceneryMode::InFront, SceneryMode::All})
+        CHECK(SceneryModeFromName(SceneryModeName(mode)) == mode);
+    CHECK(SceneryModeFromName("something else") == SceneryMode::Off);
+}
+
+TEST_CASE("SceneryMode: from the config, with the old on/off switch as fallback") {
+    CHECK(SceneryModeFromConfig(2, false) == SceneryMode::All);
+    CHECK(SceneryModeFromConfig(1, false) == SceneryMode::InFront);
+    CHECK(SceneryModeFromConfig(7, true) == SceneryMode::Off);  // unknown value
+    CHECK(SceneryModeFromConfig(std::nullopt, true) == SceneryMode::InFront);
+    CHECK(SceneryModeFromConfig(std::nullopt, false) == SceneryMode::Off);
+}
+
+TEST_CASE("IsSongEnvironmentScene: song environments only, not the menu or game scenes") {
+    CHECK(IsSongEnvironmentScene("DefaultEnvironment"));
+    CHECK(IsSongEnvironmentScene("WeaveEnvironment"));
+    CHECK_FALSE(IsSongEnvironmentScene("DefaultMenuEnvironment"));
+    CHECK_FALSE(IsSongEnvironmentScene("Environment"));
+    CHECK_FALSE(IsSongEnvironmentScene("GameCore"));
+}
+
+TEST_CASE("CullingMaskFor: All removes the environment layers, keeps notes and sabers") {
+    int game = (1 << 8) | (1 << 9) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 29);
+    int hidden = CullingMaskFor(game, true);
+    CHECK((hidden & (1 << 13)) == 0);
+    CHECK((hidden & (1 << 14)) == 0);
+    CHECK((hidden & (1 << 29)) == 0);
+    CHECK((hidden & (1 << 8)) != 0);   // notes
+    CHECK((hidden & (1 << 9)) != 0);   // debris
+    CHECK((hidden & (1 << 12)) != 0);  // sabers
+    CHECK(CullingMaskFor(game, false) == game);
 }

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -68,6 +69,46 @@ inline bool IsScenery(std::string_view sceneName, bool inTrackRing, bool inCanva
     if (inCanvas) return false;
     return inTrackRing || sceneName.find("Environment") != std::string_view::npos;
 }
+
+// "Hide scenery during songs" (only while the browser shows in songs).
+// Off; InFront: scenery between the player and the window; All: the whole song
+// environment, as the passthrough mod does (narze/beatsaber-quest-passthrough-mod).
+enum class SceneryMode { Off = 0, InFront = 1, All = 2 };
+
+inline char const* SceneryModeName(SceneryMode mode) {
+    switch (mode) {
+        case SceneryMode::InFront: return "In front of browser";
+        case SceneryMode::All: return "All";
+        default: return "Off";
+    }
+}
+
+inline SceneryMode SceneryModeFromName(std::string_view name) {
+    for (auto mode : {SceneryMode::InFront, SceneryMode::All})
+        if (name == SceneryModeName(mode)) return mode;
+    return SceneryMode::Off;
+}
+
+// The saved mode, or the old on/off switch ("hideBlockers") when there is none.
+inline SceneryMode SceneryModeFromConfig(std::optional<int> saved, bool legacyOn) {
+    if (!saved) return legacyOn ? SceneryMode::InFront : SceneryMode::Off;
+    return *saved == 1 ? SceneryMode::InFront : *saved == 2 ? SceneryMode::All : SceneryMode::Off;
+}
+
+// Beat Saber loads each song environment as its own scene, "<Name>Environment".
+// The menu environments ("...MenuEnvironment") do not count.
+inline bool IsSongEnvironmentScene(std::string_view name) {
+    constexpr std::string_view suffix = "Environment";
+    return name.size() > suffix.size() && name.ends_with(suffix) && name.find("Menu") == std::string_view::npos;
+}
+
+// Unity layers of the song environment (from the passthrough mod, Beat Saber 1.40.8):
+// 13 = lights (BoxLight, BakedBloom), 14 = geometry (rings, ...), 29 = BloomSkyboxQuad
+// (the glowing background). Notes (8), debris (9) and sabers (12) are on other layers.
+// Light scripts turn renderers on again, so All also removes these layers from the camera.
+constexpr int kEnvironmentLayers = (1 << 13) | (1 << 14) | (1 << 29);
+
+constexpr int CullingMaskFor(int original, bool hideAll) { return hideAll ? (original & ~kEnvironmentLayers) : original; }
 
 // The depth occluder: a depth-only copy of the window shape, a little behind the page.
 // It draws after the opaque scenery (still visible through a see-through window) and

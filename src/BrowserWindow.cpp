@@ -38,6 +38,7 @@
 #include "System/Type.hpp"
 #include "placement_logic.hpp"
 #include "view_logic.hpp"
+#include "Scenery.hpp"
 #include "GlobalNamespace/OVRInput.hpp"
 #include "TMPro/TextMeshProUGUI.hpp"
 #include "TMPro/TextAlignmentOptions.hpp"
@@ -154,7 +155,7 @@ void FindViewCandidates() {
 // window stay.
 void ClearView() {
     RestoreView();
-    if (!Config::GetHideBlockers() || !floatingScreen || !floatingScreen->gameObject->activeSelf) return;
+    if (!(Config::GetSceneryMode() == View::SceneryMode::InFront) || !floatingScreen || !floatingScreen->gameObject->activeSelf) return;
     FindViewCandidates();
     viewTimer = kViewCheckSeconds;
     viewRescanTimer = kViewRescanSeconds;
@@ -559,7 +560,7 @@ void EndHold() {
 bool IsHolding() { return holder != nullptr; }
 
 void UpdateClearView() {
-    if (context != Logic::Context::SongPlaying || !Config::GetHideBlockers()) return;
+    if (context != Logic::Context::SongPlaying || !(Config::GetSceneryMode() == View::SceneryMode::InFront)) return;
     if (viewRescanTimer > 0.0f) {
         viewRescanTimer -= Time::get_unscaledDeltaTime();
         if (viewRescanTimer <= 0.0f) {
@@ -630,7 +631,10 @@ void CycleAspectPreset() {
     ApplyDimensions(Resize::DimensionsFromDrag(size, 0, 0, 1, 0, Resize::AspectFor(preset), GetControlScale(), GetChromeHeight()), true);
 }
 
-void OnSongEnded() { SetContext(Logic::Context::Menu); }
+void OnSongEnded() {
+    Scenery::EndSong();
+    SetContext(Logic::Context::Menu);
+}
 
 void ResetPosition(Logic::PoseSlot slot) {
     if (placedFor == slot) {
@@ -709,6 +713,9 @@ MAKE_HOOK_MATCH(MainMenuViewController_DidActivate, &MainMenuViewController::Did
 MAKE_HOOK_MATCH(PauseController_Start, &PauseController::Start, void, PauseController* self) {
     PauseController_Start(self);
     self->gameObject->AddComponent<SongScope*>();
+    // "Hide scenery: All" only while the browser shows in this song.
+    bool shown = Logic::ScreenStateFor(Logic::Context::SongPlaying, Config::GetEnabled(), Config::GetShowInSong()).visible;
+    Scenery::BeginSong(shown && Config::GetSceneryMode() == View::SceneryMode::All);
     // A level can start paused (for example after the game lost focus).
     bool paused = self->_paused == PauseController::PauseState::Paused;
     SetContext(paused ? Logic::Context::SongPaused : Logic::Context::SongPlaying);
