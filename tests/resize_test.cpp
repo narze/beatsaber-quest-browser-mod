@@ -130,6 +130,8 @@ TEST_CASE("HandleDepthStep: while holding the handle, the stick pushes the windo
 
 TEST_CASE("HandleDepthStep: a slight stick wobble does nothing, and the distance has limits") {
     CHECK(HandleDepthStep(2.0f, 0.1f, 1.0f) == doctest::Approx(2.0f));
-    CHECK(HandleDepthStep(7.9f, 1.0f, 1.0f) <= 8.0f);
+    CHECK(HandleDepthStep(8.0f, 1.0f, 1.0f) > 8.0f);
+    CHECK(HandleDepthStep(20.0f, 1.0f, 1.0f) > 20.0f);
+    CHECK(HandleDepthStep(29.9f, 1.0f, 1.0f) == doctest::Approx(30.0f));
     CHECK(HandleDepthStep(0.4f, -1.0f, 1.0f) >= 0.3f);
 }

@@ -2,6 +2,7 @@
 
 #include "BrowserWindow.hpp"
 #include "HMUI/ImageView.hpp"
+#include "HMUI/CurvedCanvasSettings.hpp"
 #include "TMPro/FontStyles.hpp"
 #include "TMPro/TextAlignmentOptions.hpp"
 #include "TMPro/TextOverflowModes.hpp"
@@ -170,6 +171,17 @@ void ToolbarPanel::Follow() {
     if (auto screen = GetComponent<BSML::FloatingScreen*>()) {
         auto size = screen->get_ScreenSize();
         if (std::fabs(size.x - width) > 0.5f) screen->set_ScreenSize({width, kHeight});
+    }
+    auto windowSettings = window->GetComponent<HMUI::CurvedCanvasSettings*>();
+    auto barSettings = GetComponent<HMUI::CurvedCanvasSettings*>();
+    if (windowSettings && barSettings) {
+        float radius = Toolbar::CurvatureRadius(windowSettings->get_radius(), controlScale);
+        if (std::fabs(radius - barSettings->get_radius()) > 0.5f ||
+            (radius == 0.0f && barSettings->get_radius() != 0.0f)) {
+            barSettings->SetRadius(radius);
+            HMUI::CurvedCanvasSettings::RebuildAndSetup(transform);
+            RefreshCurvedText(gameObject, radius != 0.0f);
+        }
     }
     float barHeight = kHeight * controlScale;  // in window units
     Vector3 center{0.0f, -(windowHeight / 2.0f + kGap + barHeight / 2.0f), 0.0f};

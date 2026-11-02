@@ -28,6 +28,10 @@ void SetEnabled(bool value);
 
 bool GetShowInSong();
 void SetShowInSong(bool value);
+bool GetCurved();
+void SetCurved(bool value);
+int GetCurveLevel();
+void SetCurveLevel(int value);
 
 // Name of the controller combo (keybind_logic.hpp) that resets the window position when held.
 std::string GetResetKeybind();

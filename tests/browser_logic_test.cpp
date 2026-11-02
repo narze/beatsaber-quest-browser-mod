@@ -5,6 +5,31 @@
 
 using namespace QuestBrowser::Logic;
 
+TEST_CASE("Paused game selects browser targets ahead of overlapping game UI") {
+    CHECK(BrowserRaycastPriority(Context::SongPaused, true, false) == -1);
+    CHECK(BrowserRaycastPriority(Context::SongPaused, false, true) == 1);
+    CHECK(BrowserRaycastPriority(Context::SongPaused, true, true) == 0);
+    CHECK(BrowserRaycastPriority(Context::Menu, true, false) == 0);
+    CHECK(BrowserRaycastPriority(Context::SongPlaying, true, false) == 0);
+}
+
+TEST_CASE("Curve levels control strength and scale with window width") {
+    CHECK(CurveRadius(150.0f, 3) == doctest::Approx(225.0f));
+    CHECK(CurveRadius(150.0f, 1) > CurveRadius(150.0f, 3));
+    CHECK(CurveRadius(150.0f, 5) < CurveRadius(150.0f, 3));
+    CHECK(CurveRadius(150.0f, 10) < CurveRadius(150.0f, 5));
+    CHECK(CurveRadius(300.0f, 3) == doctest::Approx(450.0f));
+    CHECK(CurveRadius(150.0f, -1) == doctest::Approx(CurveRadius(150.0f, 1)));
+    CHECK(CurveRadius(150.0f, 100) == doctest::Approx(CurveRadius(150.0f, 10)));
+}
+
+TEST_CASE("Curved page coordinates recover the unwrapped horizontal position") {
+    auto projected = [](float x) { return 200.0f * std::sin(x / 200.0f); };
+    CHECK(UnwrapCurveX(projected(-70.0f), -75.0f, 75.0f, projected) == doctest::Approx(-70.0f).epsilon(0.0001));
+    CHECK(UnwrapCurveX(projected(0.0f), -75.0f, 75.0f, projected) == doctest::Approx(0.0f).epsilon(0.0001));
+    CHECK(UnwrapCurveX(projected(70.0f), -75.0f, 75.0f, projected) == doctest::Approx(70.0f).epsilon(0.0001));
+}
+
 TEST_CASE("NormalizeUrl keeps full URLs") {
     CHECK(NormalizeUrl("https://example.com/a?b=c") == "https://example.com/a?b=c");
     CHECK(NormalizeUrl("http://example.com") == "http://example.com");

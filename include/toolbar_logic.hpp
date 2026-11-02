@@ -7,6 +7,11 @@
 
 namespace QuestBrowser::Toolbar {
 
+// Both canvases must have the same radius in world units.
+inline float CurvatureRadius(float windowRadius, float controlScale) {
+    return windowRadius / std::max(controlScale, 0.0001f);
+}
+
 // The toolbar stays this long after the pointer leaves the window and the toolbar.
 constexpr float kStaySeconds = 1.5f;
 // Fade in or out in 0.2 s.

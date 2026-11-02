@@ -92,6 +92,16 @@ void SetEnabled(bool value) { SetBool("enabled", value); }
 
 bool GetShowInSong() { return GetBool("showInSong", true); }
 void SetShowInSong(bool value) { SetBool("showInSong", value); }
+bool GetCurved() { return GetBool("curved", false); }
+void SetCurved(bool value) { SetBool("curved", value); }
+int GetCurveLevel() {
+    return static_cast<int>(std::clamp(GetFloat("curveLevel", Logic::kDefaultCurveLevel),
+                                       static_cast<float>(Logic::kMinCurveLevel), static_cast<float>(Logic::kMaxCurveLevel)));
+}
+void SetCurveLevel(int value) {
+    SetFloat("curveLevel", std::clamp(value, Logic::kMinCurveLevel, Logic::kMaxCurveLevel));
+    Get().Write();
+}
 
 std::string GetResetKeybind() {
     auto it = Doc().FindMember("resetKeybind");

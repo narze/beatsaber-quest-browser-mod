@@ -27,7 +27,7 @@ class HeldButton {
 // Grab distance along the controller, in meters.
 constexpr float kGrabDepthSpeed = 3.0f;  // meters per second at full stick
 constexpr float kMinGrabDepth = 0.3f;
-constexpr float kMaxGrabDepth = 8.0f;
+constexpr float kMaxGrabDepth = 30.0f;
 constexpr float kStickDeadZone = 0.2f;
 
 inline float GrabDepth(float distance, float stickY, float deltaSeconds) {
