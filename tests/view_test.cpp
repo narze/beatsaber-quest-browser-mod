@@ -57,3 +57,11 @@ TEST_CASE("Depth occluder: a small gap behind the page, in window units") {
     CHECK(OccluderGapUnits(0.012f) * 0.012f == doctest::Approx(kOccluderGapMeters));
     CHECK(OccluderGapUnits(0.0f) > 0.0f);  // no division by zero
 }
+
+TEST_CASE("IsScenery: environment scenes and track rings, but not the HUD or game objects") {
+    CHECK(IsScenery("DefaultEnvironment", false, false));
+    CHECK(IsScenery("GameCore", true, false));          // track lane rings are spawned into GameCore
+    CHECK_FALSE(IsScenery("GameCore", false, false));   // notes, sabers, trails
+    CHECK_FALSE(IsScenery("StandardGameplay", false, false));
+    CHECK_FALSE(IsScenery("DefaultEnvironment", false, true));  // HUD canvases
+}

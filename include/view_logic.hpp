@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string_view>
 #include <vector>
 
 namespace QuestBrowser::View {
@@ -58,6 +59,14 @@ inline bool BlocksView(Vec3 eye, std::vector<Vec3> const& window, Vec3 min, Vec3
     bool around = eye.x >= min.x && eye.x <= max.x && eye.y >= min.y && eye.y <= max.y && eye.z >= min.z && eye.z <= max.z;
     if (around) return false;
     return std::any_of(window.begin(), window.end(), [&](Vec3 p) { return SegmentHitsBox(eye, p, min, max); });
+}
+
+// Renderers that "Hide scenery" may hide: those in an environment scene, and the track
+// lane rings (the game spawns them into GameCore, with the notes and sabers). Not the
+// ones inside a canvas (the HUD).
+inline bool IsScenery(std::string_view sceneName, bool inTrackRing, bool inCanvas) {
+    if (inCanvas) return false;
+    return inTrackRing || sceneName.find("Environment") != std::string_view::npos;
 }
 
 // The depth occluder: a depth-only copy of the window shape, a little behind the page.

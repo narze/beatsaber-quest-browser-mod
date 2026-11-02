@@ -26,6 +26,7 @@
 #include "UnityEngine/Time.hpp"
 #include "UnityEngine/Bounds.hpp"
 #include "UnityEngine/Canvas.hpp"
+#include "GlobalNamespace/TrackLaneRing.hpp"
 #include "UnityEngine/Material.hpp"
 #include "UnityEngine/MeshRenderer.hpp"
 #include "UnityEngine/Resources.hpp"
@@ -72,6 +73,9 @@ std::vector<SafePtrUnity<GameObject>> hiddenObjects;
 std::vector<SafePtrUnity<Renderer>> viewCandidates;
 float viewTimer = 0.0f;
 constexpr float kViewCheckSeconds = 0.25f;
+// Scan once more after the song starts: track rings can be spawned after the first scan.
+float viewRescanTimer = 0.0f;
+constexpr float kViewRescanSeconds = 1.0f;
 // The current hold of the window (grip or move handle).
 Controls::HoldSteer holdSteer;
 GlobalNamespace::VRController* holder = nullptr;
@@ -127,22 +131,33 @@ std::string CheckView() {
     return names;
 }
 
-// When the song plays (start, or resume after a move): show what was hidden, find the
-// scenery renderers, and hide those in front of the window. Renderers inside a canvas
-// (the HUD) and in other scenes (notes, sabers, this window) stay.
-void ClearView() {
-    RestoreView();
-    if (!Config::GetHideBlockers() || !floatingScreen || !floatingScreen->gameObject->activeSelf) return;
+// Find the scenery renderers (View::IsScenery) that are not hidden yet.
+void FindViewCandidates() {
+    viewCandidates.clear();
     auto canvasType = TypeOf(classof(Canvas*));
+    auto ringType = TypeOf(classof(GlobalNamespace::TrackLaneRing*));
     for (auto object : Object::FindObjectsByType(TypeOf(classof(Renderer*)), FindObjectsSortMode::None)) {
         auto renderer = reinterpret_cast<Renderer*>(object.ptr());
         if (!renderer) continue;
         auto scene = renderer->gameObject->scene;
-        if (static_cast<std::string>(scene.name).find("Environment") == std::string::npos) continue;
-        if (renderer->GetComponentInParent(canvasType, true)) continue;
-        viewCandidates.emplace_back(renderer);
+        auto sceneName = static_cast<std::string>(scene.name);
+        bool environment = sceneName.find("Environment") != std::string::npos;
+        // Only look for a ring outside the environment scenes (one call less for most).
+        bool inRing = !environment && renderer->GetComponentInParent(ringType, true);
+        bool inCanvas = (environment || inRing) && renderer->GetComponentInParent(canvasType, true);
+        if (View::IsScenery(sceneName, inRing, inCanvas)) viewCandidates.emplace_back(renderer);
     }
+}
+
+// When the song plays (start, or resume after a move): show what was hidden, find the
+// scenery, and hide what is in front of the window. Notes, sabers, the HUD and this
+// window stay.
+void ClearView() {
+    RestoreView();
+    if (!Config::GetHideBlockers() || !floatingScreen || !floatingScreen->gameObject->activeSelf) return;
+    FindViewCandidates();
     viewTimer = kViewCheckSeconds;
+    viewRescanTimer = kViewRescanSeconds;
     auto names = CheckView();
     logger.info("Scenery check: {} objects, hid {}: {}", viewCandidates.size() + hiddenObjects.size(), hiddenObjects.size(), names);
 }
@@ -544,7 +559,16 @@ void EndHold() {
 bool IsHolding() { return holder != nullptr; }
 
 void UpdateClearView() {
-    if (context != Logic::Context::SongPlaying || viewCandidates.empty()) return;
+    if (context != Logic::Context::SongPlaying || !Config::GetHideBlockers()) return;
+    if (viewRescanTimer > 0.0f) {
+        viewRescanTimer -= Time::get_unscaledDeltaTime();
+        if (viewRescanTimer <= 0.0f) {
+            // Hidden objects are inactive, so the scan does not find them again.
+            FindViewCandidates();
+            logger.info("Scenery rescan: {} objects", viewCandidates.size());
+        }
+    }
+    if (viewCandidates.empty()) return;
     viewTimer -= Time::get_unscaledDeltaTime();
     if (viewTimer > 0.0f) return;
     viewTimer = kViewCheckSeconds;
