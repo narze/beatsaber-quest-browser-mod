@@ -208,3 +208,10 @@ TEST_CASE("SlotFor: the menu has its own settings, a song (playing or paused) ha
     CHECK(SlotFor(Context::SongPlaying) == PoseSlot::Song);
     CHECK(SlotFor(Context::SongPaused) == PoseSlot::Song);
 }
+
+TEST_CASE("SortingOrderFor: in the menu the browser draws over the game UI, in songs it keeps the BSML order") {
+    // The highest game canvas in the main menu (view controllers) uses order 10.
+    CHECK(SortingOrderFor(Context::Menu) > 10);
+    CHECK(SortingOrderFor(Context::SongPlaying) == 4);
+    CHECK(SortingOrderFor(Context::SongPaused) == 4);
+}

@@ -180,6 +180,12 @@ inline int FrameRateFor(bool interactive) { return interactive ? 60 : 30; }
 
 enum class Context { Menu, SongPlaying, SongPaused };
 
+// Canvas sorting order of the browser window and toolbar (the keyboard uses one more).
+// A canvas with a higher order always draws on top. In the main menu the game's view
+// controllers use 10, so the browser goes above them. In songs it keeps the BSML
+// order, so the pause menu is not covered.
+inline int SortingOrderFor(Context context) { return context == Context::Menu ? 11 : 4; }
+
 // Return zero to let the game's normal raycast order decide.
 inline int BrowserRaycastPriority(Context context, bool leftBrowser, bool rightBrowser) {
     if (context != Context::SongPaused || leftBrowser == rightBrowser) return 0;

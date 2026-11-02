@@ -43,13 +43,13 @@ inline float TurnStep(float yawDegrees, float stickX, float deltaSeconds) {
     return yawDegrees + kTurnSpeed * stickX * deltaSeconds;
 }
 
-// While the window is held, a trigger press changes what stick Y does.
+// While the window is held, a trigger press changes what the stick does.
 enum class HoldMode { Zoom, Tilt, Resize };
 
 inline char const* HoldModeLabel(HoldMode mode) {
     switch (mode) {
-        case HoldMode::Tilt: return "Tilt: stick up / down tilts";
-        case HoldMode::Resize: return "Resize: stick up / down = bigger / smaller";
+        case HoldMode::Tilt: return "Tilt: stick up / down = tilt, left / right = turn";
+        case HoldMode::Resize: return "Resize: stick up / down = height, left / right = width";
         default: return "Zoom: stick up / down = farther / closer";
     }
 }
@@ -66,8 +66,9 @@ struct HoldInput {
 };
 
 struct HoldOutput {
-    float depthStick = 0.0f;  // zoom mode: push (+) and pull (-)
-    float sizeFactor = 1.0f;  // resize mode: multiply the window size
+    float depthStick = 0.0f;    // zoom mode: push (+) and pull (-)
+    float widthFactor = 1.0f;   // resize mode: multiply the window width
+    float heightFactor = 1.0f;  // resize mode: multiply the window height
 };
 
 // Turn and tilt are offsets from facing the player, in degrees. Tilt is added to
@@ -83,18 +84,20 @@ class HoldSteer {
     HoldOutput Update(HoldInput in) {
         if (in.triggerPressed) mode = mode == HoldMode::Zoom ? HoldMode::Tilt : mode == HoldMode::Tilt ? HoldMode::Resize : HoldMode::Zoom;
         if (in.stickClicked) turnDegrees = tiltDegrees = 0.0f;
-        turnDegrees = TurnStep(turnDegrees, in.stickX, in.deltaSeconds);
         HoldOutput out;
-        bool moved = std::fabs(in.stickY) >= kStickDeadZone;
+        bool movedX = std::fabs(in.stickX) >= kStickDeadZone;
+        bool movedY = std::fabs(in.stickY) >= kStickDeadZone;
         switch (mode) {
             case HoldMode::Zoom:
                 out.depthStick = in.stickY;
                 break;
             case HoldMode::Tilt:
-                if (moved) tiltDegrees = std::clamp(tiltDegrees - kTiltSpeed * in.stickY * in.deltaSeconds, -kMaxTilt, kMaxTilt);
+                turnDegrees = TurnStep(turnDegrees, in.stickX, in.deltaSeconds);
+                if (movedY) tiltDegrees = std::clamp(tiltDegrees - kTiltSpeed * in.stickY * in.deltaSeconds, -kMaxTilt, kMaxTilt);
                 break;
             case HoldMode::Resize:
-                if (moved) out.sizeFactor = std::exp(kResizeRate * in.stickY * in.deltaSeconds);
+                if (movedX) out.widthFactor = std::exp(kResizeRate * in.stickX * in.deltaSeconds);
+                if (movedY) out.heightFactor = std::exp(kResizeRate * in.stickY * in.deltaSeconds);
                 break;
         }
         return out;

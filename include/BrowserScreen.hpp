@@ -60,6 +60,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     void RefreshForPose() {}
     // Play mode: hide the toolbar and close panels, so only the page shows.
     void SetChromeHidden(bool hidden);
+    // Canvas sorting order of the toolbar; the keyboard gets one more.
+    void SetSortingOrder(int order);
     // Applies the opacity of the current context (menu or song).
     void ApplyOpacity() { ChangeOpacity(0.0f); }
     bool IsChromeHidden() const { return chromeHidden; }
@@ -159,7 +161,6 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     UnityW<GlobalNamespace::VRController> grabController;
     UnityEngine::Vector3 grabPosition;
     UnityEngine::Quaternion grabRotation;
-    float grabTurn = 0.0f;  // thumbstick X turn during this grab, degrees
     // Left thumbstick zoom, and how long the toolbar shows the new zoom.
     Controls::StickStepper zoomStepper;
     float zoomLabelSeconds = 0.0f;

@@ -25,12 +25,17 @@
 #include "GlobalNamespace/VRController.hpp"
 #include "UnityEngine/Time.hpp"
 #include "UnityEngine/Bounds.hpp"
+#include "UnityEngine/Canvas.hpp"
 #include "UnityEngine/FindObjectsSortMode.hpp"
 #include "UnityEngine/Renderer.hpp"
 #include "UnityEngine/SceneManagement/Scene.hpp"
 #include "System/Type.hpp"
 #include "placement_logic.hpp"
 #include "view_logic.hpp"
+#include "GlobalNamespace/OVRInput.hpp"
+#include "TMPro/TextMeshProUGUI.hpp"
+#include "TMPro/TextAlignmentOptions.hpp"
+#include "bsml/shared/BSML-Lite.hpp"
 #include "main.hpp"
 
 DEFINE_TYPE(QuestBrowser, SongScope);
@@ -56,27 +61,40 @@ SafePtrUnity<Mesh> flatHandleMesh;
 SafePtrUnity<Mesh> curvedHandleMesh;
 float handleRadius = -1.0f, handleWidth = -1.0f, handleHeight = -1.0f;
 // Scenery hidden because it was between the player and the window (this song only).
-std::vector<SafePtrUnity<Renderer>> hiddenRenderers;
-// The controller that holds the move handle, and its thumbstick turn for this grab.
-GlobalNamespace::VRController* steeredController = nullptr;
-float handleTurn = 0.0f;
+// Whole objects are hidden: the game turns light renderers back on by itself.
+std::vector<SafePtrUnity<GameObject>> hiddenObjects;
+// Scenery renderers to check again while the song plays (lasers move and turn).
+std::vector<SafePtrUnity<Renderer>> viewCandidates;
+float viewTimer = 0.0f;
+constexpr float kViewCheckSeconds = 0.25f;
+// The current hold of the window (grip or move handle).
+Controls::HoldSteer holdSteer;
+GlobalNamespace::VRController* holder = nullptr;
+bool handleHolding = false;
+bool leftTriggerWasDown = false, rightTriggerWasDown = false, stickWasDown = false;
+std::optional<Resize::Dimensions> heldSize;  // changed in resize mode during this hold
+SafePtrUnity<BSML::FloatingScreen> holdLabel;
+SafePtrUnity<TMPro::TextMeshProUGUI> holdText;
 
 View::Vec3 ToVec(Vector3 v) { return {v.x, v.y, v.z}; }
 Placement::Point ToVecP(Vector3 v) { return {v.x, v.y, v.z}; }
 
 void RestoreView() {
-    for (auto& renderer : hiddenRenderers)
-        if (renderer) renderer->enabled = true;
-    hiddenRenderers.clear();
+    for (auto& object : hiddenObjects)
+        if (object) object->SetActive(true);
+    hiddenObjects.clear();
+    viewCandidates.clear();
 }
 
-// Hide the environment renderers whose bounds are in the line of sight from the
-// head to the window. Objects in other scenes (notes, sabers, HUD, this window) stay.
-void ClearView() {
-    RestoreView();
-    if (!Config::GetHideBlockers() || !floatingScreen || !floatingScreen->gameObject->activeSelf) return;
+System::Type* TypeOf(Il2CppClass* klass) { return reinterpret_cast<System::Type*>(il2cpp_utils::GetSystemType(klass)); }
+
+// Hide the candidates whose bounds are in the line of sight from the head to the
+// window. Returns the names of the newly hidden objects.
+std::string CheckView() {
+    std::string names;
+    if (!floatingScreen) return names;
     auto camera = Camera::get_main();
-    if (!camera) return;
+    if (!camera) return names;
     auto eye = ToVec(camera->transform->position);
     auto t = floatingScreen->transform;
     auto size = floatingScreen->get_ScreenSize();
@@ -84,24 +102,46 @@ void ClearView() {
     auto right = Vector3::op_Multiply(t->right, size.x / 2.0f * scale);
     auto up = Vector3::op_Multiply(t->up, size.y / 2.0f * scale);
     auto window = View::WindowSamples(ToVec(t->position), ToVec(right), ToVec(up), 7);
-
-    auto type = reinterpret_cast<System::Type*>(il2cpp_utils::GetSystemType(classof(Renderer*)));
-    auto objects = Object::FindObjectsByType(type, FindObjectsSortMode::None);
-    std::string names;
-    for (auto object : objects) {
-        auto renderer = reinterpret_cast<Renderer*>(object.ptr());
-        if (!renderer || !renderer->enabled) continue;
-        auto scene = renderer->gameObject->scene;
-        std::string sceneName = static_cast<std::string>(scene.name);
-        if (sceneName.find("Environment") == std::string::npos) continue;
-        auto bounds = renderer->bounds;
+    for (auto& candidate : viewCandidates) {
+        if (!candidate) continue;
+        auto object = candidate->gameObject;
+        if (!object->activeInHierarchy) continue;
+        auto bounds = candidate->bounds;
         if (!View::BlocksView(eye, window, ToVec(bounds.min), ToVec(bounds.max))) continue;
-        renderer->enabled = false;
-        hiddenRenderers.emplace_back(renderer);
-        if (hiddenRenderers.size() <= 12) names += static_cast<std::string>(renderer->gameObject->name) + ", ";
+        object->SetActive(false);
+        hiddenObjects.emplace_back(object.ptr());
+        candidate = nullptr;
+        names += static_cast<std::string>(object->name) + ", ";
     }
-    logger.info("Hid {} scenery objects in front of the browser: {}", hiddenRenderers.size(), names);
+    if (!names.empty()) {
+        std::vector<SafePtrUnity<Renderer>> kept;
+        for (auto& c : viewCandidates)
+            if (c) kept.emplace_back(c.ptr());
+        viewCandidates.swap(kept);
+    }
+    return names;
 }
+
+// When the song plays (start, or resume after a move): show what was hidden, find the
+// scenery renderers, and hide those in front of the window. Renderers inside a canvas
+// (the HUD) and in other scenes (notes, sabers, this window) stay.
+void ClearView() {
+    RestoreView();
+    if (!Config::GetHideBlockers() || !floatingScreen || !floatingScreen->gameObject->activeSelf) return;
+    auto canvasType = TypeOf(classof(Canvas*));
+    for (auto object : Object::FindObjectsByType(TypeOf(classof(Renderer*)), FindObjectsSortMode::None)) {
+        auto renderer = reinterpret_cast<Renderer*>(object.ptr());
+        if (!renderer) continue;
+        auto scene = renderer->gameObject->scene;
+        if (static_cast<std::string>(scene.name).find("Environment") == std::string::npos) continue;
+        if (renderer->GetComponentInParent(canvasType, true)) continue;
+        viewCandidates.emplace_back(renderer);
+    }
+    viewTimer = kViewCheckSeconds;
+    auto names = CheckView();
+    logger.info("Scenery check: {} objects, hid {}: {}", viewCandidates.size() + hiddenObjects.size(), hiddenObjects.size(), names);
+}
+
 
 // The stock handle is a cube with a box collider. Bend its mesh and collider
 // together so grabbing works across the full visible arc.
@@ -253,6 +293,9 @@ void Apply() {
         ApplyDimensions(Config::GetDimensions(state.pose), false);
     }
     floatingScreen->gameObject->SetActive(true);
+    int order = Logic::SortingOrderFor(context);
+    if (auto canvas = floatingScreen->GetComponent<Canvas*>()) canvas->sortingOrder = order;
+    if (browserScreen) browserScreen->SetSortingOrder(order);
     floatingScreen->set_ShowHandle(state.showHandle);
     PlaceHandle();
     for (auto& grip : resizeGrips) if (grip) grip->gameObject->SetActive(state.showHandle);
@@ -273,7 +316,10 @@ void SetContext(Logic::Context value) {
     // Each time the song plays (start, resume after a move), check the view again.
     if (value == Logic::Context::SongPlaying) ClearView();
     // The song scene is gone: nothing to restore.
-    if (value == Logic::Context::Menu) hiddenRenderers.clear();
+    if (value == Logic::Context::Menu) {
+        hiddenObjects.clear();
+        viewCandidates.clear();
+    }
 }
 
 }  // namespace
@@ -284,6 +330,8 @@ void BoostHandleDepth(Component* screenComponent) {
     if (!screenComponent) return;
     auto screen = screenComponent->GetComponent<BSML::FloatingScreen*>();
     if (!screen || !screen->handle || !screen->handle->m_CachedPtr.m_value) return;
+    // The browser window: SteerHandle does this, by hold mode.
+    if (floatingScreen && screen == floatingScreen.ptr()) return;
     auto handle = screen->handle->GetComponent<BSML::FloatingScreenHandle*>();
     if (!handle || !handle->_grabbingController) return;
     auto grab = handle->_grabPos;
@@ -292,15 +340,121 @@ void BoostHandleDepth(Component* screenComponent) {
     handle->_grabPos = grab;
 }
 
-Quaternion FacingHead(Vector3 position, float turnDegrees, Quaternion fallback) {
+namespace {
+
+Quaternion FacingHead(Vector3 position, float turnDegrees, float tiltDegrees, Quaternion fallback) {
     auto camera = Camera::get_main();
     if (!camera) return fallback;
     auto a = Placement::FacingAngles(ToVecP(camera->transform->position), ToVecP(position));
-    return Quaternion::Euler(a.pitch, a.yaw + turnDegrees, 0.0f);
+    return Quaternion::Euler(a.pitch + tiltDegrees, a.yaw + turnDegrees, 0.0f);
 }
 
-// BSML moves the held window to the controller rotation times _grabRot (smoothly).
-// Set _grabRot so that the result faces the head.
+bool TriggerDown(bool left) {
+    using GlobalNamespace::OVRInput;
+    return OVRInput::Get(left ? OVRInput::RawButton::LIndexTrigger : OVRInput::RawButton::RIndexTrigger, OVRInput::Controller::Touch);
+}
+
+bool StickDown(GlobalNamespace::VRController* controller) {
+    using GlobalNamespace::OVRInput;
+    bool left = controller->node == UnityEngine::XR::XRNode::LeftHand;
+    return OVRInput::Get(left ? OVRInput::RawButton::LThumbstick : OVRInput::RawButton::RThumbstick, OVRInput::Controller::Touch);
+}
+
+// A small label above the holding hand: the mode and what the buttons do.
+void ShowHoldLabel(GlobalNamespace::VRController* controller) {
+    if (!holdLabel) {
+        auto screen = BSML::FloatingScreen::CreateFloatingScreen({100.0f, 18.0f}, false, {}, Quaternion::get_identity(), 0.0f, false);
+        screen->name = "QuestBrowserHoldLabel";
+        if (auto canvas = screen->GetComponent<Canvas*>()) canvas->sortingOrder = Logic::SortingOrderFor(Logic::Context::Menu) + 2;
+        Object::DontDestroyOnLoad(screen->gameObject);
+        auto text = BSML::Lite::CreateText(screen->transform, "", TMPro::FontStyles::Normal, 5.0f, {0.0f, 0.0f}, {100.0f, 18.0f});
+        text->alignment = TMPro::TextAlignmentOptions::Center;
+        holdText = text;
+        holdLabel = screen;
+    }
+    holdLabel->gameObject->SetActive(true);
+    if (holdText)
+        holdText->text = fmt::format("{}\n<size=70%>Trigger: next mode    Stick click: face me</size>",
+                                     Controls::HoldModeLabel(holdSteer.Mode()));
+    auto t = holdLabel->transform;
+    t->localScale = Vector3(0.0025f, 0.0025f, 0.0025f);
+    auto position = Vector3::op_Addition(controller->transform->position, Vector3(0.0f, 0.12f, 0.0f));
+    t->SetPositionAndRotation(position, FacingHead(position, 0.0f, 0.0f, t->rotation));
+}
+
+}  // namespace
+
+void BeginHold(GlobalNamespace::VRController* controller) {
+    if (!controller || !floatingScreen) return;
+    holder = controller;
+    float turn = 0.0f, tilt = 0.0f;
+    if (auto camera = Camera::get_main()) {
+        auto t = floatingScreen->transform;
+        auto facing = Placement::FacingAngles(ToVecP(camera->transform->position), ToVecP(t->position));
+        auto euler = t->rotation.eulerAngles;
+        turn = Placement::WrapDegrees(euler.y - facing.yaw);
+        tilt = Placement::WrapDegrees(euler.x - facing.pitch);
+    }
+    holdSteer.Begin(turn, tilt);
+    // Buttons already down when the hold starts (the trigger on the handle) do not count.
+    leftTriggerWasDown = TriggerDown(true);
+    rightTriggerWasDown = TriggerDown(false);
+    stickWasDown = StickDown(controller);
+    heldSize.reset();
+    ShowHoldLabel(controller);
+}
+
+float UpdateHold(GlobalNamespace::VRController* controller) {
+    if (!controller || !floatingScreen) return 0.0f;
+    if (controller != holder) BeginHold(controller);
+    bool left = TriggerDown(true), right = TriggerDown(false), stick = StickDown(controller);
+    bool triggerPressed = (left && !leftTriggerWasDown) || (right && !rightTriggerWasDown);
+    bool stickClicked = stick && !stickWasDown;
+    leftTriggerWasDown = left;
+    rightTriggerWasDown = right;
+    stickWasDown = stick;
+    auto stickAxes = controller->thumbstick;
+    auto mode = holdSteer.Mode();
+    auto out = holdSteer.Update({stickAxes.x, stickAxes.y, triggerPressed, stickClicked, Time::get_unscaledDeltaTime()});
+    if (holdSteer.Mode() != mode) logger.info("Hold mode: {}", Controls::HoldModeLabel(holdSteer.Mode()));
+    if (out.widthFactor != 1.0f || out.heightFactor != 1.0f) {
+        auto size = floatingScreen->get_ScreenSize();
+        // Each edge moves by half the change, so the window stays centered.
+        float dx = size.x * (out.widthFactor - 1.0f) / 2.0f, dy = size.y * (out.heightFactor - 1.0f) / 2.0f;
+        int axisX = out.widthFactor != 1.0f ? 1 : 0, axisY = out.heightFactor != 1.0f ? 1 : 0;
+        auto next = Resize::DimensionsFromDrag({size.x, size.y}, dx, dy, axisX, axisY,
+                                               Resize::AspectFor(GetAspectPreset()), GetControlScale(), GetChromeHeight());
+        ApplyDimensions(next, false);
+        heldSize = next;
+    }
+    ShowHoldLabel(controller);
+    return out.depthStick;
+}
+
+Quaternion HoldRotation(Vector3 position, Quaternion fallback) {
+    return FacingHead(position, holdSteer.Turn(), holdSteer.Tilt(), fallback);
+}
+
+void EndHold() {
+    if (heldSize && placedFor) Config::SetDimensions(*placedFor, *heldSize);
+    heldSize.reset();
+    holder = nullptr;
+    if (holdLabel) holdLabel->gameObject->SetActive(false);
+}
+
+bool IsHolding() { return holder != nullptr; }
+
+void UpdateClearView() {
+    if (context != Logic::Context::SongPlaying || viewCandidates.empty()) return;
+    viewTimer -= Time::get_unscaledDeltaTime();
+    if (viewTimer > 0.0f) return;
+    viewTimer = kViewCheckSeconds;
+    auto names = CheckView();
+    if (!names.empty()) logger.info("Scenery check: hid {}", names);
+}
+
+// BSML moves the held window to the controller rotation times _grabRot (smoothly),
+// and pushes and pulls it with stick Y at 1 m/s.
 void SteerHandle(Component* screenComponent) {
     if (!screenComponent || !floatingScreen || screenComponent->gameObject != floatingScreen->gameObject) return;
     if (!floatingScreen->handle || !floatingScreen->handle->m_CachedPtr.m_value) return;
@@ -308,19 +462,29 @@ void SteerHandle(Component* screenComponent) {
     if (!handle) return;
     auto controller = handle->_grabbingController;
     if (!controller) {
-        steeredController = nullptr;
+        if (handleHolding) {
+            handleHolding = false;
+            EndHold();
+        }
         return;
     }
-    if (steeredController != controller.ptr()) {
-        steeredController = controller.ptr();
-        handleTurn = 0.0f;
+    if (!handleHolding) {
+        handleHolding = true;
+        BeginHold(controller.ptr());
     }
-    handleTurn = Controls::TurnStep(handleTurn, controller->thumbstick.x, Time::get_unscaledDeltaTime());
+    UpdateHold(controller.ptr());
+    float dt = Time::get_unscaledDeltaTime();
+    float stickY = controller->thumbstick.y;
+    auto grab = handle->_grabPos;
+    // Zoom mode: faster push and pull. Other modes: undo the BSML push and pull.
+    if (holdSteer.Mode() == Controls::HoldMode::Zoom) grab.z = Resize::HandleDepthStep(grab.z, stickY, dt);
+    else grab.z -= stickY * dt;
+    handle->_grabPos = grab;
     auto anchor = controller->_viewAnchorTransform;
     if (!anchor) return;
-    auto target = anchor->TransformPoint(handle->_grabPos);
-    auto facing = FacingHead(target, handleTurn, floatingScreen->transform->rotation);
-    handle->_grabRot = Quaternion::op_Multiply(Quaternion::Inverse(anchor->rotation), facing);
+    auto target = anchor->TransformPoint(grab);
+    handle->_grabRot = Quaternion::op_Multiply(Quaternion::Inverse(anchor->rotation),
+                                               HoldRotation(target, floatingScreen->transform->rotation));
 }
 
 Logic::Context CurrentContext() { return context; }

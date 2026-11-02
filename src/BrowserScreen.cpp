@@ -1,4 +1,5 @@
 #include "BrowserScreen.hpp"
+#include "UnityEngine/Canvas.hpp"
 
 #include <chrono>
 
@@ -193,6 +194,14 @@ void BrowserScreen::SetInteractive(bool value) {
     if (ready && isActiveAndEnabled) Jni::SetFrameRate(Logic::FrameRateFor(value));
 }
 
+void BrowserScreen::SetSortingOrder(int order) {
+    if (toolbar)
+        if (auto canvas = toolbar->GetComponent<Canvas*>()) canvas->sortingOrder = order;
+    // The keyboard opens in front of the window.
+    if (keyboard)
+        if (auto canvas = keyboard->GetComponent<Canvas*>()) canvas->sortingOrder = order + 1;
+}
+
 void BrowserScreen::SetChromeHidden(bool hidden) {
     if (hidden == chromeHidden) return;
     chromeHidden = hidden;
@@ -286,6 +295,9 @@ void BrowserScreen::Update() {
     // The window: faster push and pull while its handle is held.
     Window::BoostHandleDepth(this);
     Window::SteerHandle(this);
+    Window::UpdateClearView();
+    // While the window is held, a trigger press changes the hold mode: it must not click.
+    if (canvasGroup) canvasGroup->blocksRaycasts = interactive && !Window::IsHolding();
     if (!ready) return;
     UpdateTexture();
     UpdateInput();
@@ -518,12 +530,10 @@ bool BrowserScreen::UpdateGrab(GlobalNamespace::VRController* controller, bool o
         }
         auto hand = grabController->transform;
         float dt = Time::get_unscaledDeltaTime();
-        auto stick = grabController->thumbstick;
-        grabPosition.z = Controls::GrabDepth(grabPosition.z, stick.y, dt);
-        grabTurn = Controls::TurnStep(grabTurn, stick.x, dt);
-        // The window faces the head while it moves; thumbstick X turns it.
+        grabPosition.z = Controls::GrabDepth(grabPosition.z, Window::UpdateHold(grabController.ptr()), dt);
+        // The window faces the head while it moves, with the turn and tilt of this hold.
         auto position = hand->TransformPoint(grabPosition);
-        auto facing = Window::FacingHead(position, grabTurn, Quaternion::op_Multiply(hand->rotation, grabRotation));
+        auto facing = Window::HoldRotation(position, Quaternion::op_Multiply(hand->rotation, grabRotation));
         transform->SetPositionAndRotation(position, Quaternion::Slerp(transform->rotation, facing, std::min(1.0f, 10.0f * dt)));
         return true;
     }
@@ -539,7 +549,7 @@ bool BrowserScreen::UpdateGrab(GlobalNamespace::VRController* controller, bool o
     grabController = controller;
     grabPosition = hand->InverseTransformPoint(transform->position);
     grabRotation = Quaternion::op_Multiply(Quaternion::Inverse(hand->rotation), transform->rotation);
-    grabTurn = 0.0f;
+    Window::BeginHold(controller);
     logger.info("Grabbed the window with the {} grip", controller->node == UnityEngine::XR::XRNode::LeftHand ? "left" : "right");
     return true;
 }
@@ -547,6 +557,7 @@ bool BrowserScreen::UpdateGrab(GlobalNamespace::VRController* controller, bool o
 void BrowserScreen::EndGrab() {
     if (!grabController) return;
     grabController = nullptr;
+    Window::EndHold();
     Window::SavePosition();
 }
 

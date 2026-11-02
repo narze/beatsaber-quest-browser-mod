@@ -73,13 +73,15 @@ TEST_CASE("HoldSteer: a trigger press goes to the next mode, and back to zoom af
     CHECK(steer.Mode() == HoldMode::Zoom);
 }
 
-TEST_CASE("HoldSteer: zoom mode gives stick Y to push and pull, nothing else") {
+TEST_CASE("HoldSteer: zoom mode gives stick Y to push and pull; stick X does nothing") {
     HoldSteer steer;
     steer.Begin(0, 0);
-    auto out = steer.Update({0, 0.8f, false, false, 0.5f});
+    auto out = steer.Update({1.0f, 0.8f, false, false, 0.5f});
     CHECK(out.depthStick == doctest::Approx(0.8f));
-    CHECK(out.sizeFactor == doctest::Approx(1.0f));
+    CHECK(out.widthFactor == doctest::Approx(1.0f));
+    CHECK(out.heightFactor == doctest::Approx(1.0f));
     CHECK(steer.Tilt() == doctest::Approx(0));
+    CHECK(steer.Turn() == doctest::Approx(0));
 }
 
 TEST_CASE("HoldSteer: tilt mode tilts with stick Y, up pushes the top away, within limits") {
@@ -93,25 +95,37 @@ TEST_CASE("HoldSteer: tilt mode tilts with stick Y, up pushes the top away, with
     CHECK(steer.Tilt() == doctest::Approx(-kMaxTilt));
 }
 
-TEST_CASE("HoldSteer: resize mode grows with stick up and shrinks with stick down") {
+TEST_CASE("HoldSteer: tilt mode turns with stick X") {
+    HoldSteer steer;
+    steer.Begin(0, 0);
+    steer.Update({0, 0, true, false, 0.0f});
+    steer.Update({1.0f, 0, false, false, 0.5f});
+    CHECK(steer.Turn() == doctest::Approx(kTurnSpeed * 0.5f));
+}
+
+TEST_CASE("HoldSteer: resize mode changes the height with stick Y and the width with stick X") {
     HoldSteer steer;
     steer.Begin(0, 0);
     steer.Update({0, 0, true, false, 0.0f});
     steer.Update({0, 0, true, false, 0.0f});
-    CHECK(steer.Update({0, 1.0f, false, false, 0.1f}).sizeFactor > 1.0f);
-    CHECK(steer.Update({0, -1.0f, false, false, 0.1f}).sizeFactor < 1.0f);
-    CHECK(steer.Update({0, 0.1f, false, false, 0.1f}).sizeFactor == doctest::Approx(1.0f));  // dead zone
-    CHECK(steer.Update({0, 1.0f, false, false, 0.1f}).depthStick == doctest::Approx(0));
+    auto taller = steer.Update({0, 1.0f, false, false, 0.1f});
+    CHECK(taller.heightFactor > 1.0f);
+    CHECK(taller.widthFactor == doctest::Approx(1.0f));
+    CHECK(taller.depthStick == doctest::Approx(0));
+    CHECK(steer.Update({0, -1.0f, false, false, 0.1f}).heightFactor < 1.0f);
+    auto wider = steer.Update({1.0f, 0, false, false, 0.1f});
+    CHECK(wider.widthFactor > 1.0f);
+    CHECK(wider.heightFactor == doctest::Approx(1.0f));
+    CHECK(steer.Update({-1.0f, 0, false, false, 0.1f}).widthFactor < 1.0f);
+    auto still = steer.Update({0.1f, 0.1f, false, false, 0.1f});  // dead zone
+    CHECK(still.widthFactor == doctest::Approx(1.0f));
+    CHECK(still.heightFactor == doctest::Approx(1.0f));
+    CHECK(steer.Turn() == doctest::Approx(0));
 }
 
-TEST_CASE("HoldSteer: stick X turns in every mode; a stick click faces the player again") {
+TEST_CASE("HoldSteer: a stick click faces the player again in any mode") {
     HoldSteer steer;
-    steer.Begin(0, 20.0f);
-    steer.Update({1.0f, 0, false, false, 0.5f});
-    CHECK(steer.Turn() == doctest::Approx(kTurnSpeed * 0.5f));
-    steer.Update({0, 0, true, false, 0.0f});
-    steer.Update({1.0f, 0, false, false, 0.5f});
-    CHECK(steer.Turn() == doctest::Approx(kTurnSpeed));
+    steer.Begin(30.0f, 20.0f);
     steer.Update({0, 0, false, true, 0.0f});
     CHECK(steer.Turn() == doctest::Approx(0));
     CHECK(steer.Tilt() == doctest::Approx(0));

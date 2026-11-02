@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GlobalNamespace/VRController.hpp"
 #include "UnityEngine/Component.hpp"
 #include "UnityEngine/Quaternion.hpp"
 #include "UnityEngine/Vector3.hpp"
@@ -25,12 +26,22 @@ void ResetCurrentPosition();
 // While the player holds the move handle of `screen`, the thumbstick pushes or pulls
 // it faster than BSML alone. Call every frame.
 void BoostHandleDepth(UnityEngine::Component* screen);
-// The rotation of a window at `position` that faces the player's head, turned by
-// `turnDegrees` around the vertical axis. `fallback` when there is no camera.
-UnityEngine::Quaternion FacingHead(UnityEngine::Vector3 position, float turnDegrees, UnityEngine::Quaternion fallback);
 // While the player holds the move handle of the browser window: the window faces the
-// head, and thumbstick X turns it. Call every frame.
+// head, and the stick and triggers steer it (see BeginHold). Call every frame.
 void SteerHandle(UnityEngine::Component* screen);
+// The player holds the window (grip or move handle). It keeps its turn and tilt.
+// While held: a trigger press changes the mode (zoom, tilt, resize), stick X turns,
+// stick Y zooms, tilts or resizes, and a stick click faces the player again. A label
+// near the hand shows the mode.
+void BeginHold(GlobalNamespace::VRController* holder);
+// Call every frame while held. Returns stick Y for push and pull (0 when not zooming).
+float UpdateHold(GlobalNamespace::VRController* holder);
+// The rotation of the held window at `position`: faces the head, plus the turn and tilt.
+UnityEngine::Quaternion HoldRotation(UnityEngine::Vector3 position, UnityEngine::Quaternion fallback);
+void EndHold();
+bool IsHolding();
+// "Hide scenery in front of the browser": check moving scenery again. Call every frame.
+void UpdateClearView();
 // Menu, song playing, or song paused.
 Logic::Context CurrentContext();
 // The settings of the current context: menu or song.
