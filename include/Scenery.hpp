@@ -13,6 +13,8 @@ namespace QuestBrowser::Scenery {
 void InstallHooks();
 // A song starts. hideAll: the mode is All and the browser shows in this song.
 void BeginSong(bool hideAll);
+// The mode changed during a song: hide the environment, or show it again.
+void SetHideAll(bool hideAll);
 // The song scene is gone.
 void EndSong();
 

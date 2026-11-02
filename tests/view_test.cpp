@@ -105,3 +105,12 @@ TEST_CASE("CullingMaskFor: All removes the environment layers, keeps notes and s
     CHECK((hidden & (1 << 12)) != 0);  // sabers
     CHECK(CullingMaskFor(game, false) == game);
 }
+
+TEST_CASE("NextSceneryMode: Off, In front, All, then Off again; short names for the menu") {
+    CHECK(NextSceneryMode(SceneryMode::Off) == SceneryMode::InFront);
+    CHECK(NextSceneryMode(SceneryMode::InFront) == SceneryMode::All);
+    CHECK(NextSceneryMode(SceneryMode::All) == SceneryMode::Off);
+    CHECK(std::string(SceneryModeShortName(SceneryMode::Off)) == "Off");
+    CHECK(std::string(SceneryModeShortName(SceneryMode::InFront)) == "In front");
+    CHECK(std::string(SceneryModeShortName(SceneryMode::All)) == "All");
+}

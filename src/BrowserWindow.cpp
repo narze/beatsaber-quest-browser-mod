@@ -559,6 +559,17 @@ void EndHold() {
 
 bool IsHolding() { return holder != nullptr; }
 
+void ApplySceneryMode() {
+    if (context == Logic::Context::Menu) return;
+    auto mode = Config::GetSceneryMode();
+    bool shown = Logic::ScreenStateFor(Logic::Context::SongPlaying, Config::GetEnabled(), Config::GetShowInSong()).visible;
+    Scenery::SetHideAll(shown && mode == View::SceneryMode::All);
+    // In front: checked now while playing, else when the song continues.
+    if (mode == View::SceneryMode::InFront && context == Logic::Context::SongPlaying) ClearView();
+    if (mode != View::SceneryMode::InFront) RestoreView();
+    logger.info("Hide scenery during songs: {}", View::SceneryModeName(mode));
+}
+
 void UpdateClearView() {
     if (context != Logic::Context::SongPlaying || !(Config::GetSceneryMode() == View::SceneryMode::InFront)) return;
     if (viewRescanTimer > 0.0f) {

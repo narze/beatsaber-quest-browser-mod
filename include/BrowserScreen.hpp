@@ -116,6 +116,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     UnityW<TMPro::TextMeshProUGUI> opacityText;
     UnityW<TMPro::TextMeshProUGUI> aspectText;
     UnityW<TMPro::TextMeshProUGUI> curveText;
+    UnityW<TMPro::TextMeshProUGUI> sceneryText;
 
     // History panel.
     std::vector<std::string> history;

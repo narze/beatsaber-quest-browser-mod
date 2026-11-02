@@ -24,6 +24,7 @@ namespace {
 using UnityEngine::SceneManagement::SceneManager;
 
 bool hideAll = false;  // this song
+std::vector<SafePtrUnity<UnityEngine::Renderer>> hiddenRenderers;  // to show them again
 // The gameplay camera and the culling mask the game gave it (optional: SafePtrUnity
 // can not be assigned).
 std::optional<SafePtrUnity<UnityEngine::Camera>> gameplayCamera;
@@ -49,6 +50,7 @@ void HideEnvironmentRenderers() {
             for (auto renderer : root->GetComponentsInChildren<UnityEngine::Renderer*>(true)) {
                 if (!renderer || !renderer->enabled) continue;
                 renderer->enabled = false;
+                hiddenRenderers.emplace_back(renderer);
                 ++count;
             }
         }
@@ -56,16 +58,33 @@ void HideEnvironmentRenderers() {
     }
 }
 
+void ShowEnvironmentRenderers() {
+    for (auto& renderer : hiddenRenderers)
+        if (renderer) renderer->enabled = true;
+    logger.info("Hide scenery (All) off: showed {} renderers", hiddenRenderers.size());
+    hiddenRenderers.clear();
+}
+
 }  // namespace
 
-void BeginSong(bool value) {
+void SetHideAll(bool value) {
+    if (value == hideAll) return;
     hideAll = value;
     if (hideAll) HideEnvironmentRenderers();
+    else ShowEnvironmentRenderers();
+    ApplyCullingMask();
+}
+
+void BeginSong(bool value) {
+    hideAll = false;
+    hiddenRenderers.clear();
+    SetHideAll(value);
     ApplyCullingMask();
 }
 
 void EndSong() {
     hideAll = false;
+    hiddenRenderers.clear();  // the scene is gone
     // A camera that lives on (the menu camera) gets the game's mask back.
     if (gameplayCamera && *gameplayCamera) (*gameplayCamera)->cullingMask = gameplayMask;
     gameplayCamera.reset();

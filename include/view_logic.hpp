@@ -89,6 +89,15 @@ inline SceneryMode SceneryModeFromName(std::string_view name) {
     return SceneryMode::Off;
 }
 
+inline char const* SceneryModeShortName(SceneryMode mode) {
+    return mode == SceneryMode::InFront ? "In front" : SceneryModeName(mode);
+}
+
+// Menu > View > Scenery "Change".
+inline SceneryMode NextSceneryMode(SceneryMode mode) {
+    return mode == SceneryMode::Off ? SceneryMode::InFront : mode == SceneryMode::InFront ? SceneryMode::All : SceneryMode::Off;
+}
+
 // The saved mode, or the old on/off switch ("hideBlockers") when there is none.
 inline SceneryMode SceneryModeFromConfig(std::optional<int> saved, bool legacyOn) {
     if (!saved) return legacyOn ? SceneryMode::InFront : SceneryMode::Off;

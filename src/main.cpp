@@ -60,7 +60,10 @@ void BuildSettings(HMUI::ViewController* view) {
         for (auto mode : {View::SceneryMode::Off, View::SceneryMode::InFront, View::SceneryMode::All})
             sceneryNames.push_back(View::SceneryModeName(mode));
     BSML::Lite::CreateDropdown(c, "Hide scenery during songs", View::SceneryModeName(Config::GetSceneryMode()), sceneryNames,
-                               [](StringW value) { Config::SetSceneryMode(View::SceneryModeFromName(static_cast<std::string>(value))); });
+                               [](StringW value) {
+                                   Config::SetSceneryMode(View::SceneryModeFromName(static_cast<std::string>(value)));
+                                   Window::ApplySceneryMode();
+                               });
     auto curvedToggle = BSML::Lite::CreateToggle(c, "Curved browser (experimental)", Config::GetCurved(), [](bool value) {
         Config::SetCurved(value);
         Window::Refresh();

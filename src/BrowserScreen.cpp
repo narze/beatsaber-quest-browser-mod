@@ -736,6 +736,15 @@ void BrowserScreen::BuildMenu() {
         Window::Refresh();
         RefreshMenu();
     });
+
+    // "Hide scenery during songs", also while paused in a song.
+    auto scenery = Row(panel);
+    sceneryText = Label(scenery->transform, "", 60.0f);
+    Button(scenery->transform, "Change", 28.0f, [this]() {
+        Config::SetSceneryMode(View::NextSceneryMode(Config::GetSceneryMode()));
+        Window::ApplySceneryMode();
+        RefreshMenu();
+    });
 }
 
 void BrowserScreen::RefreshMenu() {
@@ -743,6 +752,7 @@ void BrowserScreen::RefreshMenu() {
     if (opacityText) opacityText->text = fmt::format("Opacity {}%", static_cast<int>(Config::GetOpacity(Window::CurrentSlot()) * 100 + 0.5f));
     if (aspectText) aspectText->text = fmt::format("Shape: {}", Resize::AspectName(Window::GetAspectPreset()));
     if (curveText) curveText->text = fmt::format("Curve: {} {}", Config::GetCurved() ? "On" : "Off", Config::GetCurveLevel());
+    if (sceneryText) sceneryText->text = fmt::format("Scenery: {}", View::SceneryModeShortName(Config::GetSceneryMode()));
 }
 
 void BrowserScreen::BuildHistory() {

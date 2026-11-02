@@ -42,6 +42,8 @@ void EndHold();
 bool IsHolding();
 // "Hide scenery in front of the browser": check moving scenery again. Call every frame.
 void UpdateClearView();
+// The "Hide scenery during songs" mode changed: apply it now if a song runs.
+void ApplySceneryMode();
 // Menu, song playing, or song paused.
 Logic::Context CurrentContext();
 // The settings of the current context: menu or song.
