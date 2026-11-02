@@ -24,6 +24,13 @@
 #include "bsml/shared/BSML/FloatingScreen/FloatingScreenHandle.hpp"
 #include "GlobalNamespace/VRController.hpp"
 #include "UnityEngine/Time.hpp"
+#include "UnityEngine/Bounds.hpp"
+#include "UnityEngine/FindObjectsSortMode.hpp"
+#include "UnityEngine/Renderer.hpp"
+#include "UnityEngine/SceneManagement/Scene.hpp"
+#include "System/Type.hpp"
+#include "placement_logic.hpp"
+#include "view_logic.hpp"
 #include "main.hpp"
 
 DEFINE_TYPE(QuestBrowser, SongScope);
@@ -48,6 +55,53 @@ SafePtrUnity<GameObject> shapedHandle;
 SafePtrUnity<Mesh> flatHandleMesh;
 SafePtrUnity<Mesh> curvedHandleMesh;
 float handleRadius = -1.0f, handleWidth = -1.0f, handleHeight = -1.0f;
+// Scenery hidden because it was between the player and the window (this song only).
+std::vector<SafePtrUnity<Renderer>> hiddenRenderers;
+// The controller that holds the move handle, and its thumbstick turn for this grab.
+GlobalNamespace::VRController* steeredController = nullptr;
+float handleTurn = 0.0f;
+
+View::Vec3 ToVec(Vector3 v) { return {v.x, v.y, v.z}; }
+Placement::Point ToVecP(Vector3 v) { return {v.x, v.y, v.z}; }
+
+void RestoreView() {
+    for (auto& renderer : hiddenRenderers)
+        if (renderer) renderer->enabled = true;
+    hiddenRenderers.clear();
+}
+
+// Hide the environment renderers whose bounds are in the line of sight from the
+// head to the window. Objects in other scenes (notes, sabers, HUD, this window) stay.
+void ClearView() {
+    RestoreView();
+    if (!Config::GetHideBlockers() || !floatingScreen || !floatingScreen->gameObject->activeSelf) return;
+    auto camera = Camera::get_main();
+    if (!camera) return;
+    auto eye = ToVec(camera->transform->position);
+    auto t = floatingScreen->transform;
+    auto size = floatingScreen->get_ScreenSize();
+    float scale = t->lossyScale.x;
+    auto right = Vector3::op_Multiply(t->right, size.x / 2.0f * scale);
+    auto up = Vector3::op_Multiply(t->up, size.y / 2.0f * scale);
+    auto window = View::WindowSamples(ToVec(t->position), ToVec(right), ToVec(up), 7);
+
+    auto type = reinterpret_cast<System::Type*>(il2cpp_utils::GetSystemType(classof(Renderer*)));
+    auto objects = Object::FindObjectsByType(type, FindObjectsSortMode::None);
+    std::string names;
+    for (auto object : objects) {
+        auto renderer = reinterpret_cast<Renderer*>(object.ptr());
+        if (!renderer || !renderer->enabled) continue;
+        auto scene = renderer->gameObject->scene;
+        std::string sceneName = static_cast<std::string>(scene.name);
+        if (sceneName.find("Environment") == std::string::npos) continue;
+        auto bounds = renderer->bounds;
+        if (!View::BlocksView(eye, window, ToVec(bounds.min), ToVec(bounds.max))) continue;
+        renderer->enabled = false;
+        hiddenRenderers.emplace_back(renderer);
+        if (hiddenRenderers.size() <= 12) names += static_cast<std::string>(renderer->gameObject->name) + ", ";
+    }
+    logger.info("Hid {} scenery objects in front of the browser: {}", hiddenRenderers.size(), names);
+}
 
 // The stock handle is a cube with a box collider. Bend its mesh and collider
 // together so grabbing works across the full visible arc.
@@ -216,6 +270,10 @@ void Apply() {
 void SetContext(Logic::Context value) {
     context = value;
     Apply();
+    // Each time the song plays (start, resume after a move), check the view again.
+    if (value == Logic::Context::SongPlaying) ClearView();
+    // The song scene is gone: nothing to restore.
+    if (value == Logic::Context::Menu) hiddenRenderers.clear();
 }
 
 }  // namespace
@@ -232,6 +290,37 @@ void BoostHandleDepth(Component* screenComponent) {
     float stick = handle->_grabbingController->thumbstick.y;
     grab.z = Resize::HandleDepthStep(grab.z, stick, Time::get_unscaledDeltaTime());
     handle->_grabPos = grab;
+}
+
+Quaternion FacingHead(Vector3 position, float turnDegrees, Quaternion fallback) {
+    auto camera = Camera::get_main();
+    if (!camera) return fallback;
+    auto a = Placement::FacingAngles(ToVecP(camera->transform->position), ToVecP(position));
+    return Quaternion::Euler(a.pitch, a.yaw + turnDegrees, 0.0f);
+}
+
+// BSML moves the held window to the controller rotation times _grabRot (smoothly).
+// Set _grabRot so that the result faces the head.
+void SteerHandle(Component* screenComponent) {
+    if (!screenComponent || !floatingScreen || screenComponent->gameObject != floatingScreen->gameObject) return;
+    if (!floatingScreen->handle || !floatingScreen->handle->m_CachedPtr.m_value) return;
+    auto handle = floatingScreen->handle->GetComponent<BSML::FloatingScreenHandle*>();
+    if (!handle) return;
+    auto controller = handle->_grabbingController;
+    if (!controller) {
+        steeredController = nullptr;
+        return;
+    }
+    if (steeredController != controller.ptr()) {
+        steeredController = controller.ptr();
+        handleTurn = 0.0f;
+    }
+    handleTurn = Controls::TurnStep(handleTurn, controller->thumbstick.x, Time::get_unscaledDeltaTime());
+    auto anchor = controller->_viewAnchorTransform;
+    if (!anchor) return;
+    auto target = anchor->TransformPoint(handle->_grabPos);
+    auto facing = FacingHead(target, handleTurn, floatingScreen->transform->rotation);
+    handle->_grabRot = Quaternion::op_Multiply(Quaternion::Inverse(anchor->rotation), facing);
 }
 
 Logic::Context CurrentContext() { return context; }

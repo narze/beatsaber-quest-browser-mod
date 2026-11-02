@@ -95,6 +95,8 @@ void SetEnabled(bool value) { SetBool("enabled", value); }
 
 bool GetShowInSong() { return GetBool("showInSong", true); }
 void SetShowInSong(bool value) { SetBool("showInSong", value); }
+bool GetHideBlockers() { return GetBool("hideBlockers", false); }
+void SetHideBlockers(bool value) { SetBool("hideBlockers", value); }
 bool GetCurved() { return GetBool("curved", false); }
 void SetCurved(bool value) { SetBool("curved", value); }
 int GetCurveLevel() {

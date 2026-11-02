@@ -32,6 +32,9 @@ bool GetCurved();
 void SetCurved(bool value);
 int GetCurveLevel();
 void SetCurveLevel(int value);
+// During songs, hide the scenery (track, floor, buildings) between the player and the window.
+bool GetHideBlockers();
+void SetHideBlockers(bool value);
 
 // Name of the controller combo (keybind_logic.hpp) that resets the window position when held.
 std::string GetResetKeybind();

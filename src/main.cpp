@@ -53,6 +53,8 @@ void BuildSettings(HMUI::ViewController* view) {
         Config::SetShowInSong(value);
         Window::Refresh();
     });
+    BSML::Lite::CreateToggle(c, "Hide scenery in front of the browser in songs", Config::GetHideBlockers(),
+                             [](bool value) { Config::SetHideBlockers(value); });
     auto curvedToggle = BSML::Lite::CreateToggle(c, "Curved browser (experimental)", Config::GetCurved(), [](bool value) {
         Config::SetCurved(value);
         Window::Refresh();

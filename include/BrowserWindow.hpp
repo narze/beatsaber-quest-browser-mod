@@ -1,6 +1,8 @@
 #pragma once
 
 #include "UnityEngine/Component.hpp"
+#include "UnityEngine/Quaternion.hpp"
+#include "UnityEngine/Vector3.hpp"
 #include "UnityEngine/MonoBehaviour.hpp"
 #include "browser_logic.hpp"
 #include "custom-types/shared/macros.hpp"
@@ -23,6 +25,12 @@ void ResetCurrentPosition();
 // While the player holds the move handle of `screen`, the thumbstick pushes or pulls
 // it faster than BSML alone. Call every frame.
 void BoostHandleDepth(UnityEngine::Component* screen);
+// The rotation of a window at `position` that faces the player's head, turned by
+// `turnDegrees` around the vertical axis. `fallback` when there is no camera.
+UnityEngine::Quaternion FacingHead(UnityEngine::Vector3 position, float turnDegrees, UnityEngine::Quaternion fallback);
+// While the player holds the move handle of the browser window: the window faces the
+// head, and thumbstick X turns it. Call every frame.
+void SteerHandle(UnityEngine::Component* screen);
 // Menu, song playing, or song paused.
 Logic::Context CurrentContext();
 // The settings of the current context: menu or song.

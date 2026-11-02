@@ -159,6 +159,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     UnityW<GlobalNamespace::VRController> grabController;
     UnityEngine::Vector3 grabPosition;
     UnityEngine::Quaternion grabRotation;
+    float grabTurn = 0.0f;  // thumbstick X turn during this grab, degrees
     // Left thumbstick zoom, and how long the toolbar shows the new zoom.
     Controls::StickStepper zoomStepper;
     float zoomLabelSeconds = 0.0f;
