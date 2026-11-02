@@ -52,6 +52,14 @@ inline Dimensions DimensionsFromDrag(Dimensions start, float dx, float dy, int a
     return {w, h};
 }
 
+// The move handle above the window, in window units. The stock BSML handle is 80% of
+// the width and 1/15 of the height, which is a large, bright bar. This one is half
+// the width and follows the short side, so it stays thin on tall windows.
+struct HandleSize { float width, thickness; };
+inline HandleSize HandleSizeFor(Dimensions size) {
+    return {size.width * 0.5f, std::min(size.width, size.height) / 30.0f};
+}
+
 struct Vec3 {
     float x, y, z;
 };

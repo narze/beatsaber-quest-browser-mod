@@ -5,6 +5,8 @@
 
 #include <cmath>
 
+#include "resize_logic.hpp"
+
 namespace QuestBrowser::Placement {
 
 struct Point {
@@ -19,6 +21,12 @@ constexpr float kSongSelectionTop = 2.6f;
 constexpr Point kResetPosition{0.0f, 3.5f, 3.8f};
 // Tilted back toward the player, who looks up at it.
 constexpr float kResetPitchDegrees = -25.0f;
+
+// The menu has more free space than a song, so its reset window is larger: a
+// 240 x 135 page (16:9), about 2.9 m wide. It is a little higher, to clear the
+// song selection.
+constexpr Resize::Dimensions kMenuResetDimensions{240.0f + Resize::kPaddingWidth, 135.0f + Resize::kChromeHeight};
+constexpr Point kMenuResetPosition{0.0f, 3.7f, 3.8f};
 
 // The keyboard opens near the player, where it is large enough to type on.
 constexpr float kKeyboardDistance = 0.50f;  // in front of the head, meters

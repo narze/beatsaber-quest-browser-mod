@@ -25,6 +25,24 @@ TEST_CASE("Reset pose clears the song selection screens at the default window si
     CHECK(bottom >= kSongSelectionTop);
 }
 
+TEST_CASE("Menu reset: the window is larger than the in-song reset window") {
+    QuestBrowser::Resize::Dimensions song;
+    CHECK(kMenuResetDimensions.width > song.width * 1.5f);
+    CHECK(kMenuResetDimensions.height > song.height * 1.5f);
+    // The page keeps 16:9.
+    float pageW = kMenuResetDimensions.width - QuestBrowser::Resize::kPaddingWidth;
+    float pageH = kMenuResetDimensions.height - QuestBrowser::Resize::kChromeHeight;
+    CHECK(pageW / pageH == doctest::Approx(16.0f / 9.0f));
+}
+
+TEST_CASE("Menu reset: the larger window still clears the song selection screens") {
+    CHECK(kMenuResetPosition.x == doctest::Approx(0.0f));
+    float height = kMenuResetDimensions.height * 0.012f;
+    float toolbar = (2.0f + 12.0f) * 0.012f;
+    float bottom = BottomEdgeY(kMenuResetPosition.y, height, kResetPitchDegrees) - toolbar;
+    CHECK(bottom >= kSongSelectionTop);
+}
+
 TEST_CASE("KeyboardNearHead: in front of the player, below the eyes, level with the floor") {
     // Head at 1.7 m looking along +z.
     auto pose = KeyboardNearHead({0, 1.7f, 0}, {0, 0, 1});

@@ -77,8 +77,9 @@ void ShapeHandle(GameObject* handle, Vector2 size) {
     constexpr int segments = 32;
     ArrayW<Vector3> vertices(static_cast<il2cpp_array_size_t>((segments + 1) * 4));
     ArrayW<int32_t> triangles(static_cast<il2cpp_array_size_t>(segments * 24 + 12));
-    float width = size.x * 0.8f;
-    float thickness = size.y / 15.0f;
+    auto handleSize = Resize::HandleSizeFor({size.x, size.y});
+    float width = handleSize.width;
+    float thickness = handleSize.thickness;
     float y = size.y / 2.0f + thickness / 2.0f + 1.0f;
     for (int i = 0; i <= segments; ++i) {
         float x = width * (static_cast<float>(i) / segments - 0.5f);
@@ -122,13 +123,16 @@ void ShapeHandle(GameObject* handle, Vector2 size) {
 
 // The move handle sits above the window: at the bottom it sank into the floor
 // and could not be reached. BSML puts a top handle across the top edge, where it
-// would cover the toolbar, so raise it just above the edge.
+// would cover the toolbar, so raise it just above the edge. BSML sets its own,
+// larger handle scale when the size changes; replace it here.
 void PlaceHandle() {
     if (!floatingScreen) return;
     auto handle = floatingScreen->handle;
     if (!handle || !handle->m_CachedPtr.m_value) return;
     auto size = floatingScreen->get_ScreenSize();
-    float thickness = size.y / 15.0f;
+    auto handleSize = Resize::HandleSizeFor({size.x, size.y});
+    float thickness = handleSize.thickness;
+    handle->transform->localScale = Vector3(handleSize.width, thickness, thickness);
     handle->transform->localPosition = Vector3(0.0f, size.y / 2.0f + thickness / 2.0f + 1.0f, 0.0f);
     ShapeHandle(handle, size);
 }
