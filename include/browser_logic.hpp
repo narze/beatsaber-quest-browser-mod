@@ -4,6 +4,7 @@
 // so that it can be unit tested on the host (see tests/).
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -179,6 +180,14 @@ class ActiveCounter {
 inline int FrameRateFor(bool interactive) { return interactive ? 60 : 30; }
 
 enum class Context { Menu, SongPlaying, SongPaused };
+
+// Window opacity: whole 5% steps from 20% to 100%. Snapping keeps float errors from adding up.
+constexpr float kOpacityStep = 0.05f;
+constexpr float kMinOpacity = 0.2f;
+inline float StepOpacity(float current, int steps) {
+    float step = std::round(current / kOpacityStep) + static_cast<float>(steps);
+    return std::clamp(step * kOpacityStep, kMinOpacity, 1.0f);
+}
 
 // Canvas sorting order of the browser window and toolbar (the keyboard uses one more).
 // A canvas with a higher order always draws on top. In the main menu the game's view

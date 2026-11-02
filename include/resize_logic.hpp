@@ -16,6 +16,11 @@ namespace QuestBrowser::Resize {
 struct Dimensions { float width = 150, height = 87; };
 constexpr float kChromeHeight = 6;
 constexpr float kPaddingWidth = 6;
+// Names of the aspect presets (Menu > View > Shape, and the resize hold mode).
+inline char const* AspectName(int preset) {
+    constexpr char const* names[] = {"Free", "16:9", "4:3", "Portrait"};
+    return preset >= 0 && preset < 4 ? names[preset] : names[0];
+}
 inline float AspectFor(int preset) {
     return preset == 1 ? 16.0f / 9.0f : preset == 2 ? 4.0f / 3.0f : preset == 3 ? 9.0f / 16.0f : 0.0f;
 }

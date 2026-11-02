@@ -394,6 +394,12 @@ void BrowserScreen::ChangeZoom(float delta) {
     RefreshMenu();
 }
 
+void BrowserScreen::StepOpacity(int steps) {
+    auto slot = Window::CurrentSlot();
+    Config::SetOpacity(slot, Logic::StepOpacity(Config::GetOpacity(slot), steps));
+    ChangeOpacity(0.0f);
+}
+
 void BrowserScreen::ChangeOpacity(float delta) {
     auto slot = Window::CurrentSlot();
     if (delta != 0.0f) Config::SetOpacity(slot, Config::GetOpacity(slot) + delta);
@@ -700,9 +706,9 @@ void BrowserScreen::BuildMenu() {
     Button(zoom->transform, "+", 14.0f, [this]() { ChangeZoom(0.1f); });
 
     auto fade = Row(panel);
-    Button(fade->transform, "-", 14.0f, [this]() { ChangeOpacity(-0.1f); });
+    Button(fade->transform, "-", 14.0f, [this]() { StepOpacity(-1); });
     opacityText = Label(fade->transform, "", 44.0f);
-    Button(fade->transform, "+", 14.0f, [this]() { ChangeOpacity(0.1f); });
+    Button(fade->transform, "+", 14.0f, [this]() { StepOpacity(1); });
 
     auto shape = Row(panel);
     aspectText = Label(shape->transform, "", 44.0f);
@@ -733,10 +739,9 @@ void BrowserScreen::BuildMenu() {
 }
 
 void BrowserScreen::RefreshMenu() {
-    constexpr char const* names[] = {"Free", "16:9", "4:3", "Portrait"};
     if (zoomText) zoomText->text = fmt::format("Zoom {}%", static_cast<int>(Config::GetZoom() * 100 + 0.5f));
     if (opacityText) opacityText->text = fmt::format("Opacity {}%", static_cast<int>(Config::GetOpacity(Window::CurrentSlot()) * 100 + 0.5f));
-    if (aspectText) aspectText->text = fmt::format("Shape: {}", names[std::clamp(Window::GetAspectPreset(), 0, 3)]);
+    if (aspectText) aspectText->text = fmt::format("Shape: {}", Resize::AspectName(Window::GetAspectPreset()));
     if (curveText) curveText->text = fmt::format("Curve: {} {}", Config::GetCurved() ? "On" : "Off", Config::GetCurveLevel());
 }
 

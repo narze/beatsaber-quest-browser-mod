@@ -2,6 +2,8 @@
 
 #include "resize_logic.hpp"
 
+#include <string>
+
 using namespace QuestBrowser::Resize;
 
 TEST_CASE("Large windows can grow beyond the old ceiling and retain their saved dimensions") {
@@ -156,4 +158,12 @@ TEST_CASE("Move handle: a tall window does not get a thick handle") {
     auto wide = HandleSizeFor({540, 300});
     auto tall = HandleSizeFor({300, 540});
     CHECK(tall.thickness == doctest::Approx(wide.thickness));
+}
+
+TEST_CASE("AspectName: the shape presets in order, Free first") {
+    CHECK(std::string(AspectName(0)) == "Free");
+    CHECK(std::string(AspectName(1)) == "16:9");
+    CHECK(std::string(AspectName(2)) == "4:3");
+    CHECK(std::string(AspectName(3)) == "Portrait");
+    CHECK(std::string(AspectName(9)) == "Free");
 }

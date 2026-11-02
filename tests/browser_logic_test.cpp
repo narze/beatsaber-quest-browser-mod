@@ -217,3 +217,12 @@ TEST_CASE("SortingOrderFor: in the menu the browser draws over the game UI, in s
     CHECK(SortingOrderFor(Context::SongPlaying) < -2);
     CHECK(SortingOrderFor(Context::SongPaused) < -2);
 }
+
+TEST_CASE("StepOpacity: 5% steps, whole steps, between 20% and 100%") {
+    CHECK(StepOpacity(0.7f, 1) == doctest::Approx(0.75f));
+    CHECK(StepOpacity(0.7f, -1) == doctest::Approx(0.65f));
+    CHECK(StepOpacity(0.7000001f, -2) == doctest::Approx(0.6f));
+    CHECK(StepOpacity(0.72f, 0) == doctest::Approx(0.7f));  // snaps to a step
+    CHECK(StepOpacity(1.0f, 1) == doctest::Approx(1.0f));
+    CHECK(StepOpacity(0.2f, -1) == doctest::Approx(0.2f));
+}

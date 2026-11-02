@@ -64,6 +64,8 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     void SetSortingOrder(int order);
     // Applies the opacity of the current context (menu or song).
     void ApplyOpacity() { ChangeOpacity(0.0f); }
+    // Opacity of the current context (menu or song) up or down by 5% steps.
+    void StepOpacity(int steps);
     bool IsChromeHidden() const { return chromeHidden; }
     QuestBrowser::Resize::Dimensions GetDimensions() const { return dimensions; }
 

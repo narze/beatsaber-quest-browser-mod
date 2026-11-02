@@ -460,9 +460,14 @@ void ShowHoldLabel(GlobalNamespace::VRController* controller) {
         holdLabel = screen;
     }
     holdLabel->gameObject->SetActive(true);
-    if (holdText)
-        holdText->text = fmt::format("{}\n<size=70%>Trigger: next mode    Stick click: face me</size>",
-                                     Controls::HoldModeLabel(holdSteer.Mode()));
+    if (holdText) {
+        auto mode = holdSteer.Mode();
+        std::string value;
+        if (mode == Controls::HoldMode::Resize) value = fmt::format("  ({})", Resize::AspectName(GetAspectPreset()));
+        if (mode == Controls::HoldMode::Opacity)
+            value = fmt::format("  ({}%)", static_cast<int>(Config::GetOpacity(CurrentSlot()) * 100.0f + 0.5f));
+        holdText->text = fmt::format("{}{}\n<size=70%>{}</size>", Controls::HoldModeLabel(mode), value, Controls::HoldModeHint(mode));
+    }
     auto t = holdLabel->transform;
     t->localScale = Vector3(0.0025f, 0.0025f, 0.0025f);
     auto position = Vector3::op_Addition(controller->transform->position, Vector3(0.0f, 0.12f, 0.0f));
@@ -514,6 +519,13 @@ float UpdateHold(GlobalNamespace::VRController* controller) {
         ApplyDimensions(next, false);
         heldSize = next;
     }
+    if (out.nextShape) {
+        CycleAspectPreset();
+        // CycleAspectPreset saved the new size: do not save the older one at the end.
+        heldSize.reset();
+        logger.info("Hold: shape {}", Resize::AspectName(GetAspectPreset()));
+    }
+    if (out.opacitySteps != 0 && browserScreen) browserScreen->StepOpacity(out.opacitySteps);
     ShowHoldLabel(controller);
     return out.depthStick;
 }
