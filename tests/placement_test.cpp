@@ -99,3 +99,28 @@ TEST_CASE("Keyboard offset: zero offset is the default pose") {
     CHECK(a.position.y == doctest::Approx(b.position.y));
     CHECK(a.position.z == doctest::Approx(b.position.z));
 }
+
+TEST_CASE("FacingAngles: a window straight ahead at eye level is upright") {
+    auto a = FacingAngles({0, 1.7f, 0}, {0, 1.7f, 4});
+    CHECK(a.pitch == doctest::Approx(0));
+    CHECK(a.yaw == doctest::Approx(0));
+}
+
+TEST_CASE("FacingAngles: the reset window faces the player with the reset tilt") {
+    auto a = FacingAngles({0, 1.7f, 0}, kResetPosition);
+    CHECK(a.pitch == doctest::Approx(kResetPitchDegrees).epsilon(0.05));
+    CHECK(a.yaw == doctest::Approx(0));
+}
+
+TEST_CASE("FacingAngles: a window to the right turns toward the player") {
+    auto a = FacingAngles({0, 1.7f, 0}, {4, 1.7f, 0});
+    CHECK(a.yaw == doctest::Approx(90));
+    auto low = FacingAngles({0, 1.7f, 0}, {0, 0.0f, 1.7f});
+    CHECK(low.pitch == doctest::Approx(45));  // below the eyes: tilted forward
+}
+
+TEST_CASE("FacingAngles: straight above the head gives finite angles") {
+    auto a = FacingAngles({0, 1.7f, 0}, {0, 5, 0});
+    CHECK(std::isfinite(a.pitch));
+    CHECK(std::isfinite(a.yaw));
+}

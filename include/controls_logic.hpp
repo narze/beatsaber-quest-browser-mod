@@ -35,6 +35,14 @@ inline float GrabDepth(float distance, float stickY, float deltaSeconds) {
     return std::clamp(distance + kGrabDepthSpeed * stickY * deltaSeconds, kMinGrabDepth, kMaxGrabDepth);
 }
 
+// While the window is grabbed, thumbstick X turns it around its own center (degrees).
+constexpr float kTurnSpeed = 45.0f;  // degrees per second at full stick
+
+inline float TurnStep(float yawDegrees, float stickX, float deltaSeconds) {
+    if (std::fabs(stickX) < kStickDeadZone) return yawDegrees;
+    return yawDegrees + kTurnSpeed * stickX * deltaSeconds;
+}
+
 // Turns a held thumbstick into steps (+1 up, -1 down): one at once, then one every kRepeatSeconds.
 constexpr float kRepeatSeconds = 0.3f;
 

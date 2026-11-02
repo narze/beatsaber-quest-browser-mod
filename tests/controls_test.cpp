@@ -45,3 +45,9 @@ TEST_CASE("StickStepper: a flip to the other side steps at once") {
     CHECK(zoom.Update(0.9f, 0.016f) == 1);
     CHECK(zoom.Update(-0.9f, 0.016f) == -1);
 }
+
+TEST_CASE("TurnStep: thumbstick X turns the grabbed window, a resting stick does not") {
+    CHECK(TurnStep(10.0f, 0.1f, 1.0f) == doctest::Approx(10.0f));  // dead zone
+    CHECK(TurnStep(0.0f, 1.0f, 0.5f) == doctest::Approx(kTurnSpeed * 0.5f));
+    CHECK(TurnStep(0.0f, -1.0f, 0.5f) == doctest::Approx(-kTurnSpeed * 0.5f));
+}

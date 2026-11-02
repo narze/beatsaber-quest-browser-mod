@@ -77,6 +77,20 @@ inline Point ToHeadFrame(Point head, Point forward, Point position) {
     return {dx * fz - dz * fx, dy, dx * fx + dz * fz};
 }
 
+// Turn of a window at `window` that faces a head at `head`, in degrees, like Unity
+// Euler angles: pitch around x (negative tilts the top back, for a window above the
+// eyes), yaw around y (0 faces +z). No roll.
+struct Angles {
+    float pitch, yaw;
+};
+inline Angles FacingAngles(Point head, Point window) {
+    float dx = window.x - head.x, dy = window.y - head.y, dz = window.z - head.z;
+    float flat = std::sqrt(dx * dx + dz * dz);
+    constexpr float toDegrees = 180.0f / 3.14159265f;
+    float yaw = flat < 1e-4f ? 0.0f : std::atan2(dx, dz) * toDegrees;
+    return {-std::atan2(dy, flat) * toDegrees, yaw};
+}
+
 // Height of the bottom edge of a window with its center at centerY, tilted by
 // pitchDegrees around its horizontal axis.
 inline float BottomEdgeY(float centerY, float heightMeters, float pitchDegrees) {
