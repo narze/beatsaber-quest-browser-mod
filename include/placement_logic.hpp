@@ -91,6 +91,13 @@ inline Angles FacingAngles(Point head, Point window) {
     return {-std::atan2(dy, flat) * toDegrees, yaw};
 }
 
+// The same angle between -180 and 180 degrees.
+inline float WrapDegrees(float degrees) {
+    float d = std::fmod(degrees + 180.0f, 360.0f);
+    if (d < 0.0f) d += 360.0f;
+    return d - 180.0f;
+}
+
 // Height of the bottom edge of a window with its center at centerY, tilted by
 // pitchDegrees around its horizontal axis.
 inline float BottomEdgeY(float centerY, float heightMeters, float pitchDegrees) {

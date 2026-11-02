@@ -124,3 +124,9 @@ TEST_CASE("FacingAngles: straight above the head gives finite angles") {
     CHECK(std::isfinite(a.pitch));
     CHECK(std::isfinite(a.yaw));
 }
+
+TEST_CASE("WrapDegrees: angles between -180 and 180") {
+    CHECK(WrapDegrees(350.0f) == doctest::Approx(-10.0f));
+    CHECK(WrapDegrees(-190.0f) == doctest::Approx(170.0f));
+    CHECK(WrapDegrees(45.0f) == doctest::Approx(45.0f));
+}

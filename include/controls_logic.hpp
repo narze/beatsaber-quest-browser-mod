@@ -43,6 +43,73 @@ inline float TurnStep(float yawDegrees, float stickX, float deltaSeconds) {
     return yawDegrees + kTurnSpeed * stickX * deltaSeconds;
 }
 
+// While the window is held, a trigger press changes what stick Y does.
+enum class HoldMode { Zoom, Tilt, Resize };
+
+inline char const* HoldModeLabel(HoldMode mode) {
+    switch (mode) {
+        case HoldMode::Tilt: return "Tilt: stick up / down tilts";
+        case HoldMode::Resize: return "Resize: stick up / down = bigger / smaller";
+        default: return "Zoom: stick up / down = farther / closer";
+    }
+}
+
+constexpr float kTiltSpeed = 45.0f;   // degrees per second at full stick
+constexpr float kMaxTilt = 80.0f;     // degrees from facing the player
+constexpr float kResizeRate = 0.7f;   // about 2x per second at full stick
+
+struct HoldInput {
+    float stickX, stickY;
+    bool triggerPressed;  // a trigger that does not hold the window went down
+    bool stickClicked;    // the stick of the holding hand went down
+    float deltaSeconds;
+};
+
+struct HoldOutput {
+    float depthStick = 0.0f;  // zoom mode: push (+) and pull (-)
+    float sizeFactor = 1.0f;  // resize mode: multiply the window size
+};
+
+// Turn and tilt are offsets from facing the player, in degrees. Tilt is added to
+// the pitch: negative tilts the top away.
+class HoldSteer {
+   public:
+    void Begin(float turn, float tilt) {
+        mode = HoldMode::Zoom;
+        turnDegrees = turn;
+        tiltDegrees = std::clamp(tilt, -kMaxTilt, kMaxTilt);
+    }
+
+    HoldOutput Update(HoldInput in) {
+        if (in.triggerPressed) mode = mode == HoldMode::Zoom ? HoldMode::Tilt : mode == HoldMode::Tilt ? HoldMode::Resize : HoldMode::Zoom;
+        if (in.stickClicked) turnDegrees = tiltDegrees = 0.0f;
+        turnDegrees = TurnStep(turnDegrees, in.stickX, in.deltaSeconds);
+        HoldOutput out;
+        bool moved = std::fabs(in.stickY) >= kStickDeadZone;
+        switch (mode) {
+            case HoldMode::Zoom:
+                out.depthStick = in.stickY;
+                break;
+            case HoldMode::Tilt:
+                if (moved) tiltDegrees = std::clamp(tiltDegrees - kTiltSpeed * in.stickY * in.deltaSeconds, -kMaxTilt, kMaxTilt);
+                break;
+            case HoldMode::Resize:
+                if (moved) out.sizeFactor = std::exp(kResizeRate * in.stickY * in.deltaSeconds);
+                break;
+        }
+        return out;
+    }
+
+    HoldMode Mode() const { return mode; }
+    float Turn() const { return turnDegrees; }
+    float Tilt() const { return tiltDegrees; }
+
+   private:
+    HoldMode mode = HoldMode::Zoom;
+    float turnDegrees = 0.0f;
+    float tiltDegrees = 0.0f;
+};
+
 // Turns a held thumbstick into steps (+1 up, -1 down): one at once, then one every kRepeatSeconds.
 constexpr float kRepeatSeconds = 0.3f;
 
