@@ -2,6 +2,8 @@
 
 #include "resize_logic.hpp"
 
+#include <string>
+
 using namespace QuestBrowser::Resize;
 
 TEST_CASE("Large windows can grow beyond the old ceiling and retain their saved dimensions") {
@@ -134,4 +136,34 @@ TEST_CASE("HandleDepthStep: a slight stick wobble does nothing, and the distance
     CHECK(HandleDepthStep(20.0f, 1.0f, 1.0f) > 20.0f);
     CHECK(HandleDepthStep(29.9f, 1.0f, 1.0f) == doctest::Approx(30.0f));
     CHECK(HandleDepthStep(0.4f, -1.0f, 1.0f) >= 0.3f);
+}
+
+TEST_CASE("Move handle: smaller than the BSML handle at the default window size") {
+    Dimensions size;
+    auto handle = HandleSizeFor(size);
+    CHECK(handle.width < size.width * 0.8f);
+    CHECK(handle.thickness < size.height / 15.0f);
+    CHECK(handle.thickness > 0);
+}
+
+TEST_CASE("Move handle: grows and shrinks with the window") {
+    auto small = HandleSizeFor({150, 87});
+    auto large = HandleSizeFor({300, 174});
+    CHECK(large.width == doctest::Approx(small.width * 2));
+    CHECK(large.thickness == doctest::Approx(small.thickness * 2));
+}
+
+TEST_CASE("Move handle: a tall window does not get a thick handle") {
+    // Same short side, turned on its side: the same thickness.
+    auto wide = HandleSizeFor({540, 300});
+    auto tall = HandleSizeFor({300, 540});
+    CHECK(tall.thickness == doctest::Approx(wide.thickness));
+}
+
+TEST_CASE("AspectName: the shape presets in order, Free first") {
+    CHECK(std::string(AspectName(0)) == "Free");
+    CHECK(std::string(AspectName(1)) == "16:9");
+    CHECK(std::string(AspectName(2)) == "4:3");
+    CHECK(std::string(AspectName(3)) == "Portrait");
+    CHECK(std::string(AspectName(9)) == "Free");
 }

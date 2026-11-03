@@ -6,6 +6,7 @@
 #include "browser_logic.hpp"
 #include "history_logic.hpp"
 #include "resize_logic.hpp"
+#include "view_logic.hpp"
 
 // Settings saved in /sdcard/ModData/com.beatgames.beatsaber/Configs/QuestBrowser.json
 namespace QuestBrowser::Config {
@@ -32,6 +33,9 @@ bool GetCurved();
 void SetCurved(bool value);
 int GetCurveLevel();
 void SetCurveLevel(int value);
+// "Hide scenery during songs": Off, in front of the browser, or all (view_logic.hpp).
+View::SceneryMode GetSceneryMode();
+void SetSceneryMode(View::SceneryMode mode);
 
 // Name of the controller combo (keybind_logic.hpp) that resets the window position when held.
 std::string GetResetKeybind();

@@ -10,11 +10,11 @@ include(FetchContent)
 FetchContent_Declare(
     doctest
     GIT_REPOSITORY https://github.com/doctest/doctest.git
-    GIT_TAG v2.4.11
+    GIT_TAG v2.4.12
 )
 FetchContent_MakeAvailable(doctest)
 
-add_executable(browser_logic_test browser_logic_test.cpp keyboard_test.cpp resize_test.cpp shortcut_test.cpp placement_test.cpp keybind_test.cpp tabs_test.cpp ui_test.cpp songs_test.cpp bookmarks_test.cpp controls_test.cpp)
+add_executable(browser_logic_test browser_logic_test.cpp keyboard_test.cpp resize_test.cpp shortcut_test.cpp placement_test.cpp keybind_test.cpp tabs_test.cpp ui_test.cpp songs_test.cpp bookmarks_test.cpp controls_test.cpp view_test.cpp scroll_test.cpp)
 target_include_directories(browser_logic_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(browser_logic_test PRIVATE doctest::doctest)
 

@@ -10,15 +10,18 @@ namespace QuestBrowser::Config {
 namespace {
 
 // Menu and songs: centered and raised above the song selection (and the note
-// track), tilted toward the player. See placement_logic.hpp.
-Pose ResetPoseValue() {
-    auto p = Placement::kResetPosition;
+// track), tilted toward the player. The menu window is larger. See placement_logic.hpp.
+Pose ResetPoseValue(Logic::PoseSlot slot) {
+    auto p = slot == Logic::PoseSlot::Menu ? Placement::kMenuResetPosition : Placement::kResetPosition;
     return {{p.x, p.y, p.z}, UnityEngine::Quaternion::Euler(Placement::kResetPitchDegrees, 0.0f, 0.0f), kDefaultScale};
+}
+Resize::Dimensions DefaultDimensions(Logic::PoseSlot slot) {
+    return slot == Logic::PoseSlot::Menu ? Placement::kMenuResetDimensions : Resize::Dimensions{};
 }
 
 // Song keys have no prefix, for compatibility with configs from 0.1.0.
 char const* Prefix(Logic::PoseSlot slot) { return slot == Logic::PoseSlot::Menu ? "menu" : ""; }
-Pose DefaultPose(Logic::PoseSlot) { return ResetPoseValue(); }
+Pose DefaultPose(Logic::PoseSlot slot) { return ResetPoseValue(slot); }
 
 std::string Key(Logic::PoseSlot slot, char const* name) {
     std::string key = std::string(Prefix(slot)) + name;
@@ -92,6 +95,15 @@ void SetEnabled(bool value) { SetBool("enabled", value); }
 
 bool GetShowInSong() { return GetBool("showInSong", true); }
 void SetShowInSong(bool value) { SetBool("showInSong", value); }
+View::SceneryMode GetSceneryMode() {
+    std::optional<int> saved;
+    if (auto it = Doc().FindMember("sceneryMode"); it != Doc().MemberEnd() && it->value.IsNumber()) saved = static_cast<int>(it->value.GetFloat());
+    return View::SceneryModeFromConfig(saved, GetBool("hideBlockers", false));
+}
+void SetSceneryMode(View::SceneryMode mode) {
+    SetFloat("sceneryMode", static_cast<float>(static_cast<int>(mode)));
+    Get().Write();
+}
 bool GetCurved() { return GetBool("curved", false); }
 void SetCurved(bool value) { SetBool("curved", value); }
 int GetCurveLevel() {
@@ -143,7 +155,7 @@ void SetPose(Logic::PoseSlot slot, Pose const& pose) {
 
 void ResetPose(Logic::PoseSlot slot) {
     SetPose(slot, DefaultPose(slot));
-    SetDimensions(slot, {});
+    SetDimensions(slot, DefaultDimensions(slot));
     SetAspectPreset(slot, 0);
 }
 
@@ -153,7 +165,7 @@ void ResetPoses() {
 }
 
 Resize::Dimensions GetDimensions(Logic::PoseSlot slot) {
-    Resize::Dimensions d;
+    auto d = DefaultDimensions(slot);
     return Resize::DimensionsFromDrag({GetFloat(Key(slot, "width"), d.width), GetFloat(Key(slot, "height"), d.height)}, 0, 0, 0, 0, 0);
 }
 void SetDimensions(Logic::PoseSlot slot, Resize::Dimensions size) {

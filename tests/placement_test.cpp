@@ -25,6 +25,24 @@ TEST_CASE("Reset pose clears the song selection screens at the default window si
     CHECK(bottom >= kSongSelectionTop);
 }
 
+TEST_CASE("Menu reset: the window is larger than the in-song reset window") {
+    QuestBrowser::Resize::Dimensions song;
+    CHECK(kMenuResetDimensions.width > song.width * 1.5f);
+    CHECK(kMenuResetDimensions.height > song.height * 1.5f);
+    // The page keeps 16:9.
+    float pageW = kMenuResetDimensions.width - QuestBrowser::Resize::kPaddingWidth;
+    float pageH = kMenuResetDimensions.height - QuestBrowser::Resize::kChromeHeight;
+    CHECK(pageW / pageH == doctest::Approx(16.0f / 9.0f));
+}
+
+TEST_CASE("Menu reset: the larger window still clears the song selection screens") {
+    CHECK(kMenuResetPosition.x == doctest::Approx(0.0f));
+    float height = kMenuResetDimensions.height * 0.012f;
+    float toolbar = (2.0f + 12.0f) * 0.012f;
+    float bottom = BottomEdgeY(kMenuResetPosition.y, height, kResetPitchDegrees) - toolbar;
+    CHECK(bottom >= kSongSelectionTop);
+}
+
 TEST_CASE("KeyboardNearHead: in front of the player, below the eyes, level with the floor") {
     // Head at 1.7 m looking along +z.
     auto pose = KeyboardNearHead({0, 1.7f, 0}, {0, 0, 1});
@@ -80,4 +98,35 @@ TEST_CASE("Keyboard offset: zero offset is the default pose") {
     CHECK(a.position.x == doctest::Approx(b.position.x));
     CHECK(a.position.y == doctest::Approx(b.position.y));
     CHECK(a.position.z == doctest::Approx(b.position.z));
+}
+
+TEST_CASE("FacingAngles: a window straight ahead at eye level is upright") {
+    auto a = FacingAngles({0, 1.7f, 0}, {0, 1.7f, 4});
+    CHECK(a.pitch == doctest::Approx(0));
+    CHECK(a.yaw == doctest::Approx(0));
+}
+
+TEST_CASE("FacingAngles: the reset window faces the player with the reset tilt") {
+    auto a = FacingAngles({0, 1.7f, 0}, kResetPosition);
+    CHECK(a.pitch == doctest::Approx(kResetPitchDegrees).epsilon(0.05));
+    CHECK(a.yaw == doctest::Approx(0));
+}
+
+TEST_CASE("FacingAngles: a window to the right turns toward the player") {
+    auto a = FacingAngles({0, 1.7f, 0}, {4, 1.7f, 0});
+    CHECK(a.yaw == doctest::Approx(90));
+    auto low = FacingAngles({0, 1.7f, 0}, {0, 0.0f, 1.7f});
+    CHECK(low.pitch == doctest::Approx(45));  // below the eyes: tilted forward
+}
+
+TEST_CASE("FacingAngles: straight above the head gives finite angles") {
+    auto a = FacingAngles({0, 1.7f, 0}, {0, 5, 0});
+    CHECK(std::isfinite(a.pitch));
+    CHECK(std::isfinite(a.yaw));
+}
+
+TEST_CASE("WrapDegrees: angles between -180 and 180") {
+    CHECK(WrapDegrees(350.0f) == doctest::Approx(-10.0f));
+    CHECK(WrapDegrees(-190.0f) == doctest::Approx(170.0f));
+    CHECK(WrapDegrees(45.0f) == doctest::Approx(45.0f));
 }

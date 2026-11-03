@@ -20,6 +20,7 @@
 #include "controls_logic.hpp"
 #include "browser_logic.hpp"
 #include "resize_logic.hpp"
+#include "scroll_logic.hpp"
 #include "songs_logic.hpp"
 #include "tabs_logic.hpp"
 #include "custom-types/shared/macros.hpp"
@@ -60,8 +61,12 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     void RefreshForPose() {}
     // Play mode: hide the toolbar and close panels, so only the page shows.
     void SetChromeHidden(bool hidden);
+    // Canvas sorting order of the toolbar; the keyboard gets one more.
+    void SetSortingOrder(int order);
     // Applies the opacity of the current context (menu or song).
     void ApplyOpacity() { ChangeOpacity(0.0f); }
+    // Opacity of the current context (menu or song) up or down by 5% steps.
+    void StepOpacity(int steps);
     bool IsChromeHidden() const { return chromeHidden; }
     QuestBrowser::Resize::Dimensions GetDimensions() const { return dimensions; }
 
@@ -100,6 +105,13 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     std::vector<UnityW<UnityEngine::UI::LayoutElement>> panelSizes;
     // Content of each panel, designed at 144 x 81 and scaled to fill the page area.
     std::vector<UnityW<UnityEngine::RectTransform>> panelContents;
+    // How far the rows of each panel moved up, and the panel height, in content units.
+    std::vector<float> panelOffsets;
+    std::vector<float> panelMaxOffsets;
+    float panelHeight = 81.0f;
+    float panelScale = 1.0f;
+    // Moves the rows of a panel by its scroll offset; only fully shown rows take clicks.
+    void ApplyScroll(std::size_t index);
 
     bool chromeHidden = false;
     bool curvedEnabled = false;
@@ -108,10 +120,12 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     float viewportTimer = 0;
 
     // Menu panel.
+    UnityW<TMPro::TextMeshProUGUI> menuTitle;
     UnityW<TMPro::TextMeshProUGUI> zoomText;
     UnityW<TMPro::TextMeshProUGUI> opacityText;
     UnityW<TMPro::TextMeshProUGUI> aspectText;
     UnityW<TMPro::TextMeshProUGUI> curveText;
+    UnityW<TMPro::TextMeshProUGUI> sceneryText;
 
     // History panel.
     std::vector<std::string> history;

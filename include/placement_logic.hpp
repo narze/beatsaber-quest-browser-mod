@@ -5,6 +5,8 @@
 
 #include <cmath>
 
+#include "resize_logic.hpp"
+
 namespace QuestBrowser::Placement {
 
 struct Point {
@@ -19,6 +21,12 @@ constexpr float kSongSelectionTop = 2.6f;
 constexpr Point kResetPosition{0.0f, 3.5f, 3.8f};
 // Tilted back toward the player, who looks up at it.
 constexpr float kResetPitchDegrees = -25.0f;
+
+// The menu has more free space than a song, so its reset window is larger: a
+// 240 x 135 page (16:9), about 2.9 m wide. It is a little higher, to clear the
+// song selection.
+constexpr Resize::Dimensions kMenuResetDimensions{240.0f + Resize::kPaddingWidth, 135.0f + Resize::kChromeHeight};
+constexpr Point kMenuResetPosition{0.0f, 3.7f, 3.8f};
 
 // The keyboard opens near the player, where it is large enough to type on.
 constexpr float kKeyboardDistance = 0.50f;  // in front of the head, meters
@@ -67,6 +75,27 @@ inline Point ToHeadFrame(Point head, Point forward, Point position) {
     auto base = KeyboardNearHead(head, forward);
     float dx = position.x - base.position.x, dy = position.y - base.position.y, dz = position.z - base.position.z;
     return {dx * fz - dz * fx, dy, dx * fx + dz * fz};
+}
+
+// Turn of a window at `window` that faces a head at `head`, in degrees, like Unity
+// Euler angles: pitch around x (negative tilts the top back, for a window above the
+// eyes), yaw around y (0 faces +z). No roll.
+struct Angles {
+    float pitch, yaw;
+};
+inline Angles FacingAngles(Point head, Point window) {
+    float dx = window.x - head.x, dy = window.y - head.y, dz = window.z - head.z;
+    float flat = std::sqrt(dx * dx + dz * dz);
+    constexpr float toDegrees = 180.0f / 3.14159265f;
+    float yaw = flat < 1e-4f ? 0.0f : std::atan2(dx, dz) * toDegrees;
+    return {-std::atan2(dy, flat) * toDegrees, yaw};
+}
+
+// The same angle between -180 and 180 degrees.
+inline float WrapDegrees(float degrees) {
+    float d = std::fmod(degrees + 180.0f, 360.0f);
+    if (d < 0.0f) d += 360.0f;
+    return d - 180.0f;
 }
 
 // Height of the bottom edge of a window with its center at centerY, tilted by

@@ -5,6 +5,7 @@
 #include "Config.hpp"
 #include "keybind_logic.hpp"
 #include "BrowserWindow.hpp"
+#include "Scenery.hpp"
 #include "UnityEngine/Transform.hpp"
 #include "bsml/shared/BSML-Lite.hpp"
 #include "bsml/shared/BSML.hpp"
@@ -33,6 +34,7 @@ namespace {
 using QuestBrowser::Logic::PoseSlot;
 namespace Config = QuestBrowser::Config;
 namespace Window = QuestBrowser::Window;
+namespace View = QuestBrowser::View;
 
 struct CurveSettingsControls {
     SafePtrUnity<HMUI::ViewController> view;
@@ -53,6 +55,15 @@ void BuildSettings(HMUI::ViewController* view) {
         Config::SetShowInSong(value);
         Window::Refresh();
     });
+    static std::vector<std::string_view> sceneryNames;
+    if (sceneryNames.empty())
+        for (auto mode : {View::SceneryMode::Off, View::SceneryMode::InFront, View::SceneryMode::All})
+            sceneryNames.push_back(View::SceneryModeName(mode));
+    BSML::Lite::CreateDropdown(c, "Hide scenery during songs", View::SceneryModeName(Config::GetSceneryMode()), sceneryNames,
+                               [](StringW value) {
+                                   Config::SetSceneryMode(View::SceneryModeFromName(static_cast<std::string>(value)));
+                                   Window::ApplySceneryMode();
+                               });
     auto curvedToggle = BSML::Lite::CreateToggle(c, "Curved browser (experimental)", Config::GetCurved(), [](bool value) {
         Config::SetCurved(value);
         Window::Refresh();
@@ -104,6 +115,7 @@ extern "C" __attribute__((visibility("default"))) void late_load() noexcept {
     BSML::Register::RegisterSettingsMenu("Browser", ShowSettings, false);
 
     QuestBrowser::Window::InstallHooks();
+    QuestBrowser::Scenery::InstallHooks();
 
     logger.info("Completed load!");
 }

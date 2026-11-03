@@ -2,6 +2,8 @@
 
 #include "controls_logic.hpp"
 
+#include <string>
+
 using namespace QuestBrowser::Controls;
 
 TEST_CASE("HeldButton: press above the press level, release below the release level") {
@@ -44,4 +46,125 @@ TEST_CASE("StickStepper: a flip to the other side steps at once") {
     StickStepper zoom;
     CHECK(zoom.Update(0.9f, 0.016f) == 1);
     CHECK(zoom.Update(-0.9f, 0.016f) == -1);
+}
+
+TEST_CASE("TurnStep: thumbstick X turns the grabbed window, a resting stick does not") {
+    CHECK(TurnStep(10.0f, 0.1f, 1.0f) == doctest::Approx(10.0f));  // dead zone
+    CHECK(TurnStep(0.0f, 1.0f, 0.5f) == doctest::Approx(kTurnSpeed * 0.5f));
+    CHECK(TurnStep(0.0f, -1.0f, 0.5f) == doctest::Approx(-kTurnSpeed * 0.5f));
+}
+
+TEST_CASE("HoldSteer: starts in zoom mode with the given turn and tilt") {
+    HoldSteer steer;
+    steer.Begin(10.0f, -5.0f);
+    CHECK(steer.Mode() == HoldMode::Zoom);
+    CHECK(steer.Turn() == doctest::Approx(10.0f));
+    CHECK(steer.Tilt() == doctest::Approx(-5.0f));
+}
+
+TEST_CASE("HoldSteer: a trigger press goes to the next mode, and back to zoom after opacity") {
+    HoldSteer steer;
+    steer.Begin(0, 0);
+    steer.Update({0, 0, true, false, 0.01f});
+    CHECK(steer.Mode() == HoldMode::Tilt);
+    steer.Update({0, 0, true, false, 0.01f});
+    CHECK(steer.Mode() == HoldMode::Resize);
+    steer.Update({0, 0, true, false, 0.01f});
+    CHECK(steer.Mode() == HoldMode::Opacity);
+    steer.Update({0, 0, true, false, 0.01f});
+    CHECK(steer.Mode() == HoldMode::Zoom);
+}
+
+TEST_CASE("HoldSteer: zoom mode gives stick Y to push and pull; stick X does nothing") {
+    HoldSteer steer;
+    steer.Begin(0, 0);
+    auto out = steer.Update({1.0f, 0.8f, false, false, 0.5f});
+    CHECK(out.depthStick == doctest::Approx(0.8f));
+    CHECK(out.widthFactor == doctest::Approx(1.0f));
+    CHECK(out.heightFactor == doctest::Approx(1.0f));
+    CHECK(steer.Tilt() == doctest::Approx(0));
+    CHECK(steer.Turn() == doctest::Approx(0));
+}
+
+TEST_CASE("HoldSteer: tilt mode tilts with stick Y, up pushes the top away, within limits") {
+    HoldSteer steer;
+    steer.Begin(0, 0);
+    steer.Update({0, 0, true, false, 0.0f});
+    auto out = steer.Update({0, 1.0f, false, false, 0.5f});
+    CHECK(out.depthStick == doctest::Approx(0));
+    CHECK(steer.Tilt() == doctest::Approx(-kTiltSpeed * 0.5f));
+    for (int i = 0; i < 100; ++i) steer.Update({0, 1.0f, false, false, 0.5f});
+    CHECK(steer.Tilt() == doctest::Approx(-kMaxTilt));
+}
+
+TEST_CASE("HoldSteer: tilt mode turns with stick X") {
+    HoldSteer steer;
+    steer.Begin(0, 0);
+    steer.Update({0, 0, true, false, 0.0f});
+    steer.Update({1.0f, 0, false, false, 0.5f});
+    CHECK(steer.Turn() == doctest::Approx(kTurnSpeed * 0.5f));
+}
+
+TEST_CASE("HoldSteer: resize mode changes the height with stick Y and the width with stick X") {
+    HoldSteer steer;
+    steer.Begin(0, 0);
+    steer.Update({0, 0, true, false, 0.0f});
+    steer.Update({0, 0, true, false, 0.0f});
+    auto taller = steer.Update({0, 1.0f, false, false, 0.1f});
+    CHECK(taller.heightFactor > 1.0f);
+    CHECK(taller.widthFactor == doctest::Approx(1.0f));
+    CHECK(taller.depthStick == doctest::Approx(0));
+    CHECK(steer.Update({0, -1.0f, false, false, 0.1f}).heightFactor < 1.0f);
+    auto wider = steer.Update({1.0f, 0, false, false, 0.1f});
+    CHECK(wider.widthFactor > 1.0f);
+    CHECK(wider.heightFactor == doctest::Approx(1.0f));
+    CHECK(steer.Update({-1.0f, 0, false, false, 0.1f}).widthFactor < 1.0f);
+    auto still = steer.Update({0.1f, 0.1f, false, false, 0.1f});  // dead zone
+    CHECK(still.widthFactor == doctest::Approx(1.0f));
+    CHECK(still.heightFactor == doctest::Approx(1.0f));
+    CHECK(steer.Turn() == doctest::Approx(0));
+}
+
+TEST_CASE("HoldSteer: a stick click faces the player again, except in resize mode") {
+    HoldSteer steer;
+    steer.Begin(30.0f, 20.0f);
+    auto out = steer.Update({0, 0, false, true, 0.0f});
+    CHECK(steer.Turn() == doctest::Approx(0));
+    CHECK(steer.Tilt() == doctest::Approx(0));
+    CHECK_FALSE(out.nextShape);
+}
+
+TEST_CASE("HoldSteer: in resize mode a stick click goes to the next shape and keeps the angle") {
+    HoldSteer steer;
+    steer.Begin(30.0f, 20.0f);
+    steer.Update({0, 0, true, false, 0.0f});
+    steer.Update({0, 0, true, false, 0.0f});
+    auto out = steer.Update({0, 0, false, true, 0.0f});
+    CHECK(out.nextShape);
+    CHECK(steer.Turn() == doctest::Approx(30.0f));
+    CHECK(steer.Tilt() == doctest::Approx(20.0f));
+}
+
+TEST_CASE("HoldSteer: opacity mode steps with stick Y, once at once and then repeated") {
+    HoldSteer steer;
+    steer.Begin(0, 0);
+    for (int i = 0; i < 3; ++i) steer.Update({0, 0, true, false, 0.0f});
+    CHECK(steer.Mode() == HoldMode::Opacity);
+    CHECK(steer.Update({0, 1.0f, false, false, 0.01f}).opacitySteps == 1);
+    CHECK(steer.Update({0, 1.0f, false, false, 0.01f}).opacitySteps == 0);  // held: wait for the repeat
+    CHECK(steer.Update({0, 1.0f, false, false, kRepeatSeconds}).opacitySteps == 1);
+    steer.Update({0, 0, false, false, 0.01f});
+    CHECK(steer.Update({0, -1.0f, false, false, 0.01f}).opacitySteps == -1);
+    auto out = steer.Update({1.0f, 0, false, false, 0.5f});
+    CHECK(out.depthStick == doctest::Approx(0));
+    CHECK(steer.Turn() == doctest::Approx(0));
+}
+
+TEST_CASE("HoldModeLabel: names the mode") {
+    CHECK(std::string(HoldModeLabel(HoldMode::Zoom)).find("Zoom") != std::string::npos);
+    CHECK(std::string(HoldModeLabel(HoldMode::Tilt)).find("Tilt") != std::string::npos);
+    CHECK(std::string(HoldModeLabel(HoldMode::Resize)).find("Resize") != std::string::npos);
+    CHECK(std::string(HoldModeLabel(HoldMode::Opacity)).find("Opacity") != std::string::npos);
+    CHECK(std::string(HoldModeHint(HoldMode::Resize)).find("shape") != std::string::npos);
+    CHECK(std::string(HoldModeHint(HoldMode::Zoom)).find("face") != std::string::npos);
 }

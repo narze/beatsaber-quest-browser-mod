@@ -199,7 +199,8 @@ void ToolbarPanel::LateUpdate() {
     if (!interactive) fader.Hide();
     else fader.Update(PointerOnUs(), actions.pinned && actions.pinned(), dt);
     canvasGroup->alpha = fader.Alpha();
-    canvasGroup->blocksRaycasts = fader.Clickable();
+    // While the window is held, a trigger press changes the hold mode: it must not click.
+    canvasGroup->blocksRaycasts = fader.Clickable() && !Window::IsHolding();
 
     labelTimer -= dt;
     if (labelTimer > 0.0f || fader.Alpha() <= 0.0f) return;

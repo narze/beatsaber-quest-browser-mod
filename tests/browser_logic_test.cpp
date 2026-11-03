@@ -208,3 +208,21 @@ TEST_CASE("SlotFor: the menu has its own settings, a song (playing or paused) ha
     CHECK(SlotFor(Context::SongPlaying) == PoseSlot::Song);
     CHECK(SlotFor(Context::SongPaused) == PoseSlot::Song);
 }
+
+TEST_CASE("SortingOrderFor: in the menu the browser draws over the game UI, in songs under everything") {
+    // The highest game canvas in the main menu (view controllers) uses order 10.
+    CHECK(SortingOrderFor(Context::Menu) > 10);
+    // In songs, walls, scores, trails and the HUD (lowest canvas: -2) draw after the
+    // browser; the depth occluder hides those behind it.
+    CHECK(SortingOrderFor(Context::SongPlaying) < -2);
+    CHECK(SortingOrderFor(Context::SongPaused) < -2);
+}
+
+TEST_CASE("StepOpacity: 5% steps, whole steps, between 20% and 100%") {
+    CHECK(StepOpacity(0.7f, 1) == doctest::Approx(0.75f));
+    CHECK(StepOpacity(0.7f, -1) == doctest::Approx(0.65f));
+    CHECK(StepOpacity(0.7000001f, -2) == doctest::Approx(0.6f));
+    CHECK(StepOpacity(0.72f, 0) == doctest::Approx(0.7f));  // snaps to a step
+    CHECK(StepOpacity(1.0f, 1) == doctest::Approx(1.0f));
+    CHECK(StepOpacity(0.2f, -1) == doctest::Approx(0.2f));
+}

@@ -1,4 +1,5 @@
 #include "BrowserScreen.hpp"
+#include "UnityEngine/Canvas.hpp"
 
 #include <chrono>
 
@@ -7,6 +8,7 @@
 #include "HMUI/CurvedCanvasSettings.hpp"
 #include "HMUI/CurvedCanvasSettingsHelper.hpp"
 #include "HMUI/CurvedTextMeshPro.hpp"
+#include "UnityEngine/UI/RectMask2D.hpp"
 #include "TMPro/TMP_TextInfo.hpp"
 #include "TMPro/TMP_MeshInfo.hpp"
 #include "UnityEngine/Mesh.hpp"
@@ -52,6 +54,12 @@ constexpr int kPageHeight = 720;
 constexpr float kTriggerPress = 0.75f;
 constexpr float kTriggerRelease = 0.35f;
 constexpr float kScrollSpeed = 0.25f;
+
+// Gap between two rows of a panel, and the height of a row and of a button or label.
+// The button text and underline use only part of the height, so rows stay compact.
+constexpr float kPanelSpacing = 1.0f;
+constexpr float kRowHeight = 7.0f;
+constexpr float kItemHeight = 7.0f;
 
 // Rows per page in the tabs and history panels.
 constexpr std::size_t kRows = 5;
@@ -107,8 +115,8 @@ void SetSize(Component* c, float width, float height) {
 }
 
 UI::Button* Button(Transform* parent, std::string_view text, float width, std::function<void()> onClick) {
-    auto button = BSML::Lite::CreateUIButton(parent, std::string(text), Vector2(0, 0), Vector2(width, 9), std::move(onClick));
-    SetSize(button, width, 9.0f);
+    auto button = BSML::Lite::CreateUIButton(parent, std::string(text), Vector2(0, 0), Vector2(width, kItemHeight), std::move(onClick));
+    SetSize(button, width, kItemHeight);
     if (auto label = button->GetComponentInChildren<TMPro::TextMeshProUGUI*>()) {
         label->richText = false;
         label->fontStyle = TMPro::FontStyles::Normal;
@@ -125,7 +133,7 @@ UI::HorizontalLayoutGroup* Row(Transform* parent) {
     row->childForceExpandWidth = false;
     row->childControlWidth = true;
     row->childAlignment = TextAnchor::MiddleCenter;
-    SetSize(row, 136.0f, 10.0f);
+    SetSize(row, 136.0f, kRowHeight);
     return row;
 }
 
@@ -134,7 +142,7 @@ TMPro::TextMeshProUGUI* Label(Transform* parent, std::string_view text, float wi
     label->fontStyle = TMPro::FontStyles::Normal;
     label->alignment = TMPro::TextAlignmentOptions::Center;
     label->enableWordWrapping = false;
-    SetSize(label, width, 9.0f);
+    SetSize(label, width, kItemHeight);
     return label;
 }
 
@@ -191,6 +199,14 @@ void BrowserScreen::SetInteractive(bool value) {
         EndGrab();
     }
     if (ready && isActiveAndEnabled) Jni::SetFrameRate(Logic::FrameRateFor(value));
+}
+
+void BrowserScreen::SetSortingOrder(int order) {
+    if (toolbar)
+        if (auto canvas = toolbar->GetComponent<Canvas*>()) canvas->sortingOrder = order;
+    // The keyboard opens in front of the window.
+    if (keyboard)
+        if (auto canvas = keyboard->GetComponent<Canvas*>()) canvas->sortingOrder = order + 1;
 }
 
 void BrowserScreen::SetChromeHidden(bool hidden) {
@@ -285,6 +301,10 @@ void BrowserScreen::OnDisable() {
 void BrowserScreen::Update() {
     // The window: faster push and pull while its handle is held.
     Window::BoostHandleDepth(this);
+    Window::SteerHandle(this);
+    Window::UpdateClearView();
+    // While the window is held, a trigger press changes the hold mode: it must not click.
+    if (canvasGroup) canvasGroup->blocksRaycasts = interactive && !Window::IsHolding();
     if (!ready) return;
     UpdateTexture();
     UpdateInput();
@@ -318,6 +338,9 @@ void BrowserScreen::SetDimensions(Resize::Dimensions size) {
     float panelScale = Resize::PanelScale(pageWidth, pageHeight);
     for (auto& content : panelContents)
         if (content) content->localScale = Vector3(panelScale, panelScale, 1.0f);
+    this->panelScale = panelScale;
+    panelHeight = pageHeight / panelScale;
+    for (std::size_t i = 0; i < panelContents.size(); ++i) ApplyScroll(i);
     if (keyboard) keyboard->SetWindowHeight(size.height);
     if (toolbar) toolbar->SetWindowSize(size.width, size.height);
     viewportDirty = true;
@@ -379,6 +402,12 @@ void BrowserScreen::ChangeZoom(float delta) {
     Config::SetZoom(Config::GetZoom() + delta);
     viewportDirty = true;
     RefreshMenu();
+}
+
+void BrowserScreen::StepOpacity(int steps) {
+    auto slot = Window::CurrentSlot();
+    Config::SetOpacity(slot, Logic::StepOpacity(Config::GetOpacity(slot), steps));
+    ChangeOpacity(0.0f);
 }
 
 void BrowserScreen::ChangeOpacity(float delta) {
@@ -448,6 +477,16 @@ void BrowserScreen::UpdateInput() {
     auto overTarget = over ? over->transform : nullptr;
     bool overWindow = overTarget && (overTarget->IsChildOf(transform) || (toolbar && overTarget->IsChildOf(toolbar->transform)));
     if (UpdateGrab(controller.ptr(), overWindow)) return;
+    // While the laser is on an open panel, the thumbstick scrolls its rows smoothly.
+    if (overWindow && openPanel != Panel::None) {
+        auto index = static_cast<std::size_t>(openPanel) - 1;
+        float stick = controller->thumbstick.y;
+        if (index < panelOffsets.size() && stick != 0.0f) {
+            float before = panelOffsets[index];
+            panelOffsets[index] = Scroll::StepOffset(before, stick, Time::get_unscaledDeltaTime(), panelMaxOffsets[index]);
+            if (panelOffsets[index] != before) ApplyScroll(index);
+        }
+    }
     float trigger = controller->triggerValue;
     bool wasHeld = triggerHeld;
     triggerHeld = triggerHeld ? trigger > kTriggerRelease : trigger > kTriggerPress;
@@ -516,8 +555,12 @@ bool BrowserScreen::UpdateGrab(GlobalNamespace::VRController* controller, bool o
             return false;
         }
         auto hand = grabController->transform;
-        grabPosition.z = Controls::GrabDepth(grabPosition.z, grabController->thumbstick.y, Time::get_unscaledDeltaTime());
-        transform->SetPositionAndRotation(hand->TransformPoint(grabPosition), Quaternion::op_Multiply(hand->rotation, grabRotation));
+        float dt = Time::get_unscaledDeltaTime();
+        grabPosition.z = Controls::GrabDepth(grabPosition.z, Window::UpdateHold(grabController.ptr()), dt);
+        // The window faces the head while it moves, with the turn and tilt of this hold.
+        auto position = hand->TransformPoint(grabPosition);
+        auto facing = Window::HoldRotation(position, Quaternion::op_Multiply(hand->rotation, grabRotation));
+        transform->SetPositionAndRotation(position, Quaternion::Slerp(transform->rotation, facing, std::min(1.0f, 10.0f * dt)));
         return true;
     }
     bool wasHeld = grip.Held();
@@ -532,6 +575,7 @@ bool BrowserScreen::UpdateGrab(GlobalNamespace::VRController* controller, bool o
     grabController = controller;
     grabPosition = hand->InverseTransformPoint(transform->position);
     grabRotation = Quaternion::op_Multiply(Quaternion::Inverse(hand->rotation), transform->rotation);
+    Window::BeginHold(controller);
     logger.info("Grabbed the window with the {} grip", controller->node == UnityEngine::XR::XRNode::LeftHand ? "left" : "right");
     return true;
 }
@@ -539,6 +583,7 @@ bool BrowserScreen::UpdateGrab(GlobalNamespace::VRController* controller, bool o
 void BrowserScreen::EndGrab() {
     if (!grabController) return;
     grabController = nullptr;
+    Window::EndHold();
     Window::SavePosition();
 }
 
@@ -612,12 +657,14 @@ GameObject* BrowserScreen::MakePanel() {
     auto root = GameObject::New_ctor("QuestBrowserPanel");
     root->transform->SetParent(pageImage->transform->parent, false);
     root->AddComponent<RectTransform*>();
+    // Rows scrolled out of the panel are cut at its edges.
+    root->AddComponent<UI::RectMask2D*>();
     auto size = root->AddComponent<UI::LayoutElement*>();
     size->preferredWidth = 144.0f;
     size->preferredHeight = 81.0f;
 
     auto content = BSML::Lite::CreateVerticalLayoutGroup(root->transform);
-    content->spacing = 1.0f;
+    content->spacing = kPanelSpacing;
     content->childForceExpandHeight = false;
     content->childControlHeight = true;
     content->childAlignment = TextAnchor::MiddleCenter;
@@ -632,6 +679,8 @@ GameObject* BrowserScreen::MakePanel() {
     panels.push_back(root);
     panelSizes.push_back(size);
     panelContents.push_back(rect);
+    panelOffsets.push_back(0.0f);
+    panelMaxOffsets.push_back(0.0f);
     root->SetActive(false);
     return content->gameObject;
 }
@@ -648,12 +697,52 @@ void BrowserScreen::ShowPanel(Panel panel) {
     if (panel == Panel::Menu) RefreshMenu();
     if (panel == Panel::History) RefreshHistory();
     if (panel == Panel::Bookmarks) RefreshBookmarks();
-    if (panel != Panel::None) RefreshCurvedText(panels[static_cast<int>(panel) - 1].ptr(), curvedEnabled);
+    if (panel != Panel::None) {
+        auto index = static_cast<std::size_t>(panel) - 1;
+        if (index < panelOffsets.size()) panelOffsets[index] = 0.0f;
+        ApplyScroll(index);
+        RefreshCurvedText(panels[index].ptr(), curvedEnabled);
+    }
+}
+
+void BrowserScreen::ApplyScroll(std::size_t index) {
+    if (index >= panelContents.size() || !panelContents[index]) return;
+    auto content = panelContents[index];
+    // The layout skips inactive rows, so the scroll does too.
+    std::vector<UnityW<GameObject>> rows;
+    std::vector<float> heights;
+    for (int i = 0; i < content->childCount; ++i) {
+        auto row = content->GetChild(i)->gameObject;
+        if (!row->activeSelf) continue;
+        auto size = row->GetComponent<UI::LayoutElement*>();
+        rows.push_back(row);
+        heights.push_back(size ? size->preferredHeight : kRowHeight);
+    }
+    float total = Scroll::ContentHeight(heights, kPanelSpacing);
+    float maxOffset = Scroll::MaxOffset(total, panelHeight);
+    panelMaxOffsets[index] = maxOffset;
+    float& offset = panelOffsets[index];
+    offset = std::clamp(offset, 0.0f, maxOffset);
+    content->sizeDelta = {content->sizeDelta.x, total};
+    content->anchoredPosition = {0.0f, Scroll::ContentShift(total, panelHeight, offset) * panelScale};
+
+    // Rows cut by the panel edge take no clicks.
+    float top = 0.0f;
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        auto group = rows[i]->GetComponent<CanvasGroup*>();
+        if (!group) group = rows[i]->AddComponent<CanvasGroup*>();
+        group->blocksRaycasts = maxOffset <= 0.0f || Scroll::RowShown(top, heights[i], offset, panelHeight);
+        top += heights[i] + kPanelSpacing;
+    }
+    if (index == static_cast<std::size_t>(Panel::Menu) - 1 && menuTitle) {
+        auto hint = Scroll::Hint(offset, maxOffset);
+        menuTitle->text = hint.empty() ? "Menu" : fmt::format("Menu  ({})", hint);
+    }
 }
 
 void BrowserScreen::BuildMenu() {
     auto panel = MakePanel()->transform;
-    Label(panel, "Menu", 60.0f);
+    menuTitle = Label(panel, "Menu", 60.0f);
 
     auto nav = Row(panel);
     Button(nav->transform, "Home", 33.0f, [this]() {
@@ -681,9 +770,9 @@ void BrowserScreen::BuildMenu() {
     Button(zoom->transform, "+", 14.0f, [this]() { ChangeZoom(0.1f); });
 
     auto fade = Row(panel);
-    Button(fade->transform, "-", 14.0f, [this]() { ChangeOpacity(-0.1f); });
+    Button(fade->transform, "-", 14.0f, [this]() { StepOpacity(-1); });
     opacityText = Label(fade->transform, "", 44.0f);
-    Button(fade->transform, "+", 14.0f, [this]() { ChangeOpacity(0.1f); });
+    Button(fade->transform, "+", 14.0f, [this]() { StepOpacity(1); });
 
     auto shape = Row(panel);
     aspectText = Label(shape->transform, "", 44.0f);
@@ -711,14 +800,23 @@ void BrowserScreen::BuildMenu() {
         Window::Refresh();
         RefreshMenu();
     });
+
+    // "Hide scenery during songs", also while paused in a song.
+    auto scenery = Row(panel);
+    sceneryText = Label(scenery->transform, "", 60.0f);
+    Button(scenery->transform, "Change", 28.0f, [this]() {
+        Config::SetSceneryMode(View::NextSceneryMode(Config::GetSceneryMode()));
+        Window::ApplySceneryMode();
+        RefreshMenu();
+    });
 }
 
 void BrowserScreen::RefreshMenu() {
-    constexpr char const* names[] = {"Free", "16:9", "4:3", "Portrait"};
     if (zoomText) zoomText->text = fmt::format("Zoom {}%", static_cast<int>(Config::GetZoom() * 100 + 0.5f));
     if (opacityText) opacityText->text = fmt::format("Opacity {}%", static_cast<int>(Config::GetOpacity(Window::CurrentSlot()) * 100 + 0.5f));
-    if (aspectText) aspectText->text = fmt::format("Shape: {}", names[std::clamp(Window::GetAspectPreset(), 0, 3)]);
+    if (aspectText) aspectText->text = fmt::format("Shape: {}", Resize::AspectName(Window::GetAspectPreset()));
     if (curveText) curveText->text = fmt::format("Curve: {} {}", Config::GetCurved() ? "On" : "Off", Config::GetCurveLevel());
+    if (sceneryText) sceneryText->text = fmt::format("Scenery: {}", View::SceneryModeShortName(Config::GetSceneryMode()));
 }
 
 void BrowserScreen::BuildHistory() {
