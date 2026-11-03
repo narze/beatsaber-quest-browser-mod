@@ -13,6 +13,10 @@ on:
         description: "Message for release"
         required: true
 
+# Creating the release and its tag needs write access to the repository contents.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
