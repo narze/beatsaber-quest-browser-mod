@@ -1,61 +1,55 @@
 #pragma once
 
 #include <algorithm>
-#include <cstddef>
 #include <string>
 #include <vector>
 
-// Scrolling of a panel whose rows do not all fit in the window. The first `pinned` rows
-// (the title) always show; the other rows show from an offset, as many as fit.
+#include "browser_logic.hpp"
+
+// Smooth scrolling of a panel whose rows do not all fit in the window. Units are the
+// panel content units (a row is 10). The offset is how far the rows moved up.
 namespace QuestBrowser::Scroll {
 
-struct Range {
-    std::size_t first = 0;  // first scrolled row that shows
-    std::size_t end = 0;    // one past the last row that shows
-    bool moreAbove = false;
-    bool moreBelow = false;
-};
+// Rows per second at full stick.
+constexpr float kRowsPerSecond = 4.0f;
+constexpr float kRowHeight = 10.0f;
+constexpr float kDeadZone = 0.2f;
 
-// `heights` are the row heights, `spacing` is the gap between two rows, `available` is
-// the height of the panel. `offset` is the number of scrolled rows above the view; it
-// stops when the last row shows.
-inline Range Visible(std::vector<float> const& heights, std::size_t pinned, float spacing, float available,
-                     std::size_t offset) {
-    std::size_t n = heights.size();
-    pinned = std::min(pinned, n);
-    float used = 0.0f;
-    for (std::size_t i = 0; i < pinned; ++i) used += heights[i] + spacing;
-    float room = available - used + spacing;  // no gap after the last row
-
-    // The smallest first row such that all rows below it fit.
-    std::size_t lowest = n;
-    float tail = 0.0f;
-    while (lowest > pinned && tail + heights[lowest - 1] + spacing <= room + 1e-4f) {
-        tail += heights[lowest - 1] + spacing;
-        --lowest;
-    }
-    if (lowest == n && n > pinned) lowest = n - 1;  // at least one row shows
-
-    Range r;
-    r.first = std::min(pinned + offset, lowest);
-    r.end = r.first;
-    float rows = 0.0f;
-    while (r.end < n && (r.end == r.first || rows + heights[r.end] + spacing <= room + 1e-4f)) {
-        rows += heights[r.end] + spacing;
-        ++r.end;
-    }
-    r.moreAbove = r.first > pinned;
-    r.moreBelow = r.end < n;
-    return r;
+inline float ContentHeight(std::vector<float> const& heights, float spacing) {
+    if (heights.empty()) return 0.0f;
+    float total = spacing * static_cast<float>(heights.size() - 1);
+    for (float h : heights) total += h;
+    return total;
 }
 
-inline std::size_t Offset(Range const& r, std::size_t pinned) { return r.first > pinned ? r.first - pinned : 0; }
+inline float MaxOffset(float contentHeight, float available) { return std::max(0.0f, contentHeight - available); }
 
-inline std::string Hint(Range const& r) {
-    if (r.moreAbove && r.moreBelow) return "stick: more";
-    if (r.moreBelow) return "stick down: more";
-    if (r.moreAbove) return "stick up: more";
-    return "";
+// Stick down shows the rows below.
+inline float StepOffset(float offset, float stickY, float deltaSeconds, float maxOffset) {
+    float speed = Logic::ThumbstickToScroll(stickY, kDeadZone, kRowsPerSecond * kRowHeight);
+    return std::clamp(offset - speed * deltaSeconds, 0.0f, maxOffset);
+}
+
+// Shift of the content center from the panel center: rows that fit stay in the
+// middle; rows that do not fit start at the top and move up by the offset.
+inline float ContentShift(float contentHeight, float available, float offset) {
+    if (contentHeight <= available) return 0.0f;
+    return (available - contentHeight) * 0.5f + std::clamp(offset, 0.0f, contentHeight - available);
+}
+
+// True when a row (top measured from the content top) is fully in the view.
+inline bool RowShown(float top, float height, float offset, float available) {
+    constexpr float kSlack = 0.01f;
+    return top >= offset - kSlack && top + height <= offset + available + kSlack;
+}
+
+inline std::string Hint(float offset, float maxOffset) {
+    constexpr float kSlack = 0.01f;
+    if (maxOffset <= kSlack) return "";
+    bool above = offset > kSlack;
+    bool below = offset < maxOffset - kSlack;
+    if (above && below) return "stick: more";
+    return below ? "stick down: more" : "stick up: more";
 }
 
 }  // namespace QuestBrowser::Scroll

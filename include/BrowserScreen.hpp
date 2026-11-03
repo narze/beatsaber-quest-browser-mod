@@ -105,13 +105,13 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     std::vector<UnityW<UnityEngine::UI::LayoutElement>> panelSizes;
     // Content of each panel, designed at 144 x 81 and scaled to fill the page area.
     std::vector<UnityW<UnityEngine::RectTransform>> panelContents;
-    // Scrolled rows above the view, per panel, and the panel height in content units.
-    std::vector<std::size_t> panelOffsets;
+    // How far the rows of each panel moved up, and the panel height, in content units.
+    std::vector<float> panelOffsets;
+    std::vector<float> panelMaxOffsets;
     float panelHeight = 81.0f;
-    // Shows the rows of a panel that fit, from its scroll offset. The title row stays.
+    float panelScale = 1.0f;
+    // Moves the rows of a panel by its scroll offset; only fully shown rows take clicks.
     void ApplyScroll(std::size_t index);
-    // Thumbstick up or down while the laser is on an open panel.
-    Controls::StickStepper panelStepper;
 
     bool chromeHidden = false;
     bool curvedEnabled = false;
