@@ -54,6 +54,9 @@ constexpr float kTriggerPress = 0.75f;
 constexpr float kTriggerRelease = 0.35f;
 constexpr float kScrollSpeed = 0.25f;
 
+// Gap between two rows of a panel.
+constexpr float kPanelSpacing = 1.0f;
+
 // Rows per page in the tabs and history panels.
 constexpr std::size_t kRows = 5;
 
@@ -331,6 +334,8 @@ void BrowserScreen::SetDimensions(Resize::Dimensions size) {
     float panelScale = Resize::PanelScale(pageWidth, pageHeight);
     for (auto& content : panelContents)
         if (content) content->localScale = Vector3(panelScale, panelScale, 1.0f);
+    panelHeight = pageHeight / panelScale;
+    for (std::size_t i = 0; i < panelContents.size(); ++i) ApplyScroll(i);
     if (keyboard) keyboard->SetWindowHeight(size.height);
     if (toolbar) toolbar->SetWindowSize(size.width, size.height);
     viewportDirty = true;
@@ -467,6 +472,19 @@ void BrowserScreen::UpdateInput() {
     auto overTarget = over ? over->transform : nullptr;
     bool overWindow = overTarget && (overTarget->IsChildOf(transform) || (toolbar && overTarget->IsChildOf(toolbar->transform)));
     if (UpdateGrab(controller.ptr(), overWindow)) return;
+    // While the laser is on an open panel, the thumbstick scrolls its rows.
+    bool onPanel = overWindow && openPanel != Panel::None;
+    int rowStep = panelStepper.Update(onPanel ? controller->thumbstick.y : 0.0f, Time::get_unscaledDeltaTime());
+    if (rowStep != 0) {
+        auto index = static_cast<std::size_t>(openPanel) - 1;
+        if (index < panelOffsets.size()) {
+            auto& offset = panelOffsets[index];
+            if (rowStep < 0) ++offset;
+            else if (offset > 0) --offset;
+            ApplyScroll(index);
+            RefreshCurvedText(panels[index].ptr(), curvedEnabled);
+        }
+    }
     float trigger = controller->triggerValue;
     bool wasHeld = triggerHeld;
     triggerHeld = triggerHeld ? trigger > kTriggerRelease : trigger > kTriggerPress;
@@ -642,7 +660,7 @@ GameObject* BrowserScreen::MakePanel() {
     size->preferredHeight = 81.0f;
 
     auto content = BSML::Lite::CreateVerticalLayoutGroup(root->transform);
-    content->spacing = 1.0f;
+    content->spacing = kPanelSpacing;
     content->childForceExpandHeight = false;
     content->childControlHeight = true;
     content->childAlignment = TextAnchor::MiddleCenter;
@@ -657,6 +675,7 @@ GameObject* BrowserScreen::MakePanel() {
     panels.push_back(root);
     panelSizes.push_back(size);
     panelContents.push_back(rect);
+    panelOffsets.push_back(0);
     root->SetActive(false);
     return content->gameObject;
 }
@@ -673,12 +692,40 @@ void BrowserScreen::ShowPanel(Panel panel) {
     if (panel == Panel::Menu) RefreshMenu();
     if (panel == Panel::History) RefreshHistory();
     if (panel == Panel::Bookmarks) RefreshBookmarks();
-    if (panel != Panel::None) RefreshCurvedText(panels[static_cast<int>(panel) - 1].ptr(), curvedEnabled);
+    if (panel != Panel::None) {
+        auto index = static_cast<std::size_t>(panel) - 1;
+        if (index < panelOffsets.size()) panelOffsets[index] = 0;
+        ApplyScroll(index);
+        RefreshCurvedText(panels[index].ptr(), curvedEnabled);
+    }
+}
+
+void BrowserScreen::ApplyScroll(std::size_t index) {
+    if (index >= panelContents.size() || !panelContents[index]) return;
+    auto content = panelContents[index]->transform;
+    int count = content->childCount;
+    std::vector<float> heights;
+    for (int i = 0; i < count; ++i) {
+        auto size = content->GetChild(i)->GetComponent<UI::LayoutElement*>();
+        heights.push_back(size ? size->preferredHeight : 10.0f);
+    }
+    constexpr std::size_t kPinned = 1;  // the title
+    auto range = Scroll::Visible(heights, kPinned, kPanelSpacing, panelHeight, panelOffsets[index]);
+    panelOffsets[index] = Scroll::Offset(range, kPinned);
+    for (int i = static_cast<int>(kPinned); i < count; ++i) {
+        bool show = static_cast<std::size_t>(i) >= range.first && static_cast<std::size_t>(i) < range.end;
+        auto row = content->GetChild(i)->gameObject;
+        if (row->activeSelf != show) row->SetActive(show);
+    }
+    if (index == static_cast<std::size_t>(Panel::Menu) - 1 && menuTitle) {
+        auto hint = Scroll::Hint(range);
+        menuTitle->text = hint.empty() ? "Menu" : fmt::format("Menu  ({})", hint);
+    }
 }
 
 void BrowserScreen::BuildMenu() {
     auto panel = MakePanel()->transform;
-    Label(panel, "Menu", 60.0f);
+    menuTitle = Label(panel, "Menu", 60.0f);
 
     auto nav = Row(panel);
     Button(nav->transform, "Home", 33.0f, [this]() {

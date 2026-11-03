@@ -20,6 +20,7 @@
 #include "controls_logic.hpp"
 #include "browser_logic.hpp"
 #include "resize_logic.hpp"
+#include "scroll_logic.hpp"
 #include "songs_logic.hpp"
 #include "tabs_logic.hpp"
 #include "custom-types/shared/macros.hpp"
@@ -104,6 +105,13 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     std::vector<UnityW<UnityEngine::UI::LayoutElement>> panelSizes;
     // Content of each panel, designed at 144 x 81 and scaled to fill the page area.
     std::vector<UnityW<UnityEngine::RectTransform>> panelContents;
+    // Scrolled rows above the view, per panel, and the panel height in content units.
+    std::vector<std::size_t> panelOffsets;
+    float panelHeight = 81.0f;
+    // Shows the rows of a panel that fit, from its scroll offset. The title row stays.
+    void ApplyScroll(std::size_t index);
+    // Thumbstick up or down while the laser is on an open panel.
+    Controls::StickStepper panelStepper;
 
     bool chromeHidden = false;
     bool curvedEnabled = false;
@@ -112,6 +120,7 @@ DECLARE_CLASS_CODEGEN(QuestBrowser, BrowserScreen, UnityEngine::MonoBehaviour) {
     float viewportTimer = 0;
 
     // Menu panel.
+    UnityW<TMPro::TextMeshProUGUI> menuTitle;
     UnityW<TMPro::TextMeshProUGUI> zoomText;
     UnityW<TMPro::TextMeshProUGUI> opacityText;
     UnityW<TMPro::TextMeshProUGUI> aspectText;
