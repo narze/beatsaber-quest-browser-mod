@@ -55,8 +55,11 @@ constexpr float kTriggerPress = 0.75f;
 constexpr float kTriggerRelease = 0.35f;
 constexpr float kScrollSpeed = 0.25f;
 
-// Gap between two rows of a panel.
+// Gap between two rows of a panel, and the height of a row and of a button or label.
+// The button text and underline use only part of the height, so rows stay compact.
 constexpr float kPanelSpacing = 1.0f;
+constexpr float kRowHeight = 7.0f;
+constexpr float kItemHeight = 7.0f;
 
 // Rows per page in the tabs and history panels.
 constexpr std::size_t kRows = 5;
@@ -112,8 +115,8 @@ void SetSize(Component* c, float width, float height) {
 }
 
 UI::Button* Button(Transform* parent, std::string_view text, float width, std::function<void()> onClick) {
-    auto button = BSML::Lite::CreateUIButton(parent, std::string(text), Vector2(0, 0), Vector2(width, 9), std::move(onClick));
-    SetSize(button, width, 9.0f);
+    auto button = BSML::Lite::CreateUIButton(parent, std::string(text), Vector2(0, 0), Vector2(width, kItemHeight), std::move(onClick));
+    SetSize(button, width, kItemHeight);
     if (auto label = button->GetComponentInChildren<TMPro::TextMeshProUGUI*>()) {
         label->richText = false;
         label->fontStyle = TMPro::FontStyles::Normal;
@@ -130,7 +133,7 @@ UI::HorizontalLayoutGroup* Row(Transform* parent) {
     row->childForceExpandWidth = false;
     row->childControlWidth = true;
     row->childAlignment = TextAnchor::MiddleCenter;
-    SetSize(row, 136.0f, 10.0f);
+    SetSize(row, 136.0f, kRowHeight);
     return row;
 }
 
@@ -139,7 +142,7 @@ TMPro::TextMeshProUGUI* Label(Transform* parent, std::string_view text, float wi
     label->fontStyle = TMPro::FontStyles::Normal;
     label->alignment = TMPro::TextAlignmentOptions::Center;
     label->enableWordWrapping = false;
-    SetSize(label, width, 9.0f);
+    SetSize(label, width, kItemHeight);
     return label;
 }
 
@@ -713,7 +716,7 @@ void BrowserScreen::ApplyScroll(std::size_t index) {
         if (!row->activeSelf) continue;
         auto size = row->GetComponent<UI::LayoutElement*>();
         rows.push_back(row);
-        heights.push_back(size ? size->preferredHeight : 10.0f);
+        heights.push_back(size ? size->preferredHeight : kRowHeight);
     }
     float total = Scroll::ContentHeight(heights, kPanelSpacing);
     float maxOffset = Scroll::MaxOffset(total, panelHeight);

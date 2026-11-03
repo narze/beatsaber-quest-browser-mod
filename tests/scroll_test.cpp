@@ -23,7 +23,7 @@ TEST_CASE("MaxOffset: how far the rows can scroll") {
 TEST_CASE("StepOffset: the stick moves the rows smoothly, in proportion to time") {
     // Stick down shows the rows below.
     float down = StepOffset(0, -1, 0.1f, 50);
-    CHECK(down == doctest::Approx(kRowsPerSecond * 10 * 0.1f));
+    CHECK(down == doctest::Approx(kRowsPerSecond * kRowHeight * 0.1f));
     CHECK(StepOffset(0, -1, 0.05f, 50) == doctest::Approx(down / 2));
     // Stick up goes back.
     CHECK(StepOffset(20, 1, 0.1f, 50) == doctest::Approx(20 - down));

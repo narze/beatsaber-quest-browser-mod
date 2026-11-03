@@ -7,12 +7,12 @@
 #include "browser_logic.hpp"
 
 // Smooth scrolling of a panel whose rows do not all fit in the window. Units are the
-// panel content units (a row is 10). The offset is how far the rows moved up.
+// panel content units. The offset is how far the rows moved up.
 namespace QuestBrowser::Scroll {
 
 // Rows per second at full stick.
 constexpr float kRowsPerSecond = 4.0f;
-constexpr float kRowHeight = 10.0f;
+constexpr float kRowHeight = 8.0f;  // a row and the gap below it
 constexpr float kDeadZone = 0.2f;
 
 inline float ContentHeight(std::vector<float> const& heights, float spacing) {
